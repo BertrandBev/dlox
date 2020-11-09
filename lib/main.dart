@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:dlox/vm.dart';
+import 'package:dlox/vm_temp.dart';
 
 void repl() {
   while (true) {
