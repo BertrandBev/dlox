@@ -1,14 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:dlox/vm_temp.dart';
+import 'package:dlox/vm.dart';
+
+VM vm = VM();
 
 void repl() {
   while (true) {
     stdout.write('> ');
     final line = stdin.readLineSync(encoding: Encoding.getByName('utf-8'));
     if (line == null) break;
-    interpret(line + '\n');
+    vm.interpret(line + '\n');
   }
 }
 
@@ -18,14 +20,15 @@ String readFile(String path) {
 
 void runFile(String path) {
   final source = readFile(path);
-  final result = interpret(source);
-  if (result == InterpretResult.INTERPRET_COMPILE_ERROR) exit(65);
-  if (result == InterpretResult.INTERPRET_RUNTIME_ERROR) exit(70);
+  final result = vm.interpret(source);
+  if (result == InterpretResult.COMPILE_ERROR) exit(65);
+  if (result == InterpretResult.RUNTIME_ERROR) exit(70);
 }
 
 void main(List<String> args) {
   // initVM();
-  // args = ["examples/method_call.lox"];
+  args = ['examples/binary_trees.lox'];
+
   if (args.isEmpty) {
     repl();
   } else if (args.length == 1) {

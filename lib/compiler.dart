@@ -305,7 +305,7 @@ class Compiler {
 
   void binary(bool canAssign) {
     var operatorType = parser.previous.type;
-    ParseRule rule = getRule(operatorType);
+    final rule = getRule(operatorType);
     parsePrecedence(Precedence.values[rule.precedence.index + 1]);
 
     // Emit the operator instruction.

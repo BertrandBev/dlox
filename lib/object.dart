@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:dlox/chunk.dart';
 import 'package:dlox/table.dart';
+import 'package:dlox/value.dart';
 
-typedef NativeFunction = Object Function(int argCount, List<Object> args);
+typedef NativeFunction = Object Function(
+    List<Object> stack, int argIdx, int argCount);
 
 class ObjNative {
   String name;
@@ -22,8 +24,8 @@ class ObjFunction {
 }
 
 class ObjUpvalue {
-  Object location;
-  Object closed;
+  int location;
+  Object closed = Nil;
   ObjUpvalue next;
 
   ObjUpvalue(this.location);
@@ -42,7 +44,9 @@ class ObjClosure {
 
 class ObjClass {
   String name;
-  Table methods;
+  Table methods = Table();
+
+  ObjClass(this.name);
 }
 
 class ObjInstance {
@@ -91,5 +95,9 @@ void printObject(Object value) {
     stdout.write('<native fn>');
   } else if (value is String) {
     stdout.write(value);
-  } else if (value is ObjUpvalue) stdout.write('upvalue');
+  } else if (value is ObjUpvalue) {
+    stdout.write('upvalue');
+  } else {
+    stderr.writeln('Unsupported object type: $value');
+  }
 }

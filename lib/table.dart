@@ -5,8 +5,10 @@ class Table {
     return data[key];
   }
 
-  void setVal(String key, Object val) {
+  bool setVal(String key, Object val) {
+    final hadKey = data.containsKey(key);
     data[key] = val;
+    return !hadKey;
   }
 
   void delete(String key) {
