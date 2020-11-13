@@ -242,12 +242,12 @@ class VM {
 
   int checkIndex(List arr, Object idxObj) {
     if (!(idxObj is double)) {
-      runtimeError('Array index must be a number.');
+      runtimeError('List index must be a number.');
       return null;
     }
     final idx = (idxObj as double).toInt();
     if (idx < 0 || idx >= arr.length) {
-      runtimeError('Array index out of bounds.');
+      runtimeError('List index out of bounds.');
       return null;
     }
     return idx;
@@ -439,7 +439,7 @@ class VM {
             } else if ((a is List) && (b is List)) {
               push(a + b);
             } else {
-              runtimeError('Operands must numbers, strings or arrays.');
+              runtimeError('Operands must numbers, strings or lists.');
               return InterpretResult.RUNTIME_ERROR;
             }
             break;
@@ -604,7 +604,7 @@ class VM {
           defineMethod(readString(frame));
           break;
 
-        case OpCode.ARRAY_INIT:
+        case OpCode.LIST_INIT:
           final valCount = readByte(frame);
           final arr = [];
           for (var k = 0; k < valCount; k++) {
@@ -614,25 +614,49 @@ class VM {
           push(arr);
           break;
 
-        case OpCode.ARRAY_GET:
+        case OpCode.CONTAINER_GET:
           {
             final idxObj = pop();
-            final arr = pop() as List;
-            final idx = checkIndex(arr, idxObj);
-            push(arr[idx]);
+            final container = pop();
+            if (container is List) {
+              final idx = checkIndex(container, idxObj);
+              push(container[idx]);
+            } else if (container is Map) {
+              push(container[idxObj]);
+            } else {
+              runtimeError('Indexing targets must be Lists or Maps');
+              return InterpretResult.RUNTIME_ERROR;
+            }
             break;
           }
 
-        case OpCode.ARRAY_SET:
+        case OpCode.CONTAINER_SET:
           {
             final val = pop();
             final idxObj = pop();
-            final arr = pop() as List;
-            final idx = checkIndex(arr, idxObj);
-            arr[idx] = val;
+            final container = pop();
+            if (container is List) {
+              final idx = checkIndex(container, idxObj);
+              container[idx] = val;
+            } else if (container is Map) {
+              container[idxObj] = val;
+            } else {
+              runtimeError('Indexing targets must be Lists or Maps');
+              return InterpretResult.RUNTIME_ERROR;
+            }
             push(val);
             break;
           }
+
+        case OpCode.MAP_INIT:
+          final valCount = readByte(frame);
+          final map = {};
+          for (var k = 0; k < valCount; k++) {
+            map[peek(valCount - 2 * k - 1)] = peek(valCount - 2 * k - 2);
+          }
+          stackTop -= 2 * valCount;
+          push(map);
+          break;
       }
     }
   }

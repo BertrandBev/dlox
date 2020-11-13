@@ -20,6 +20,16 @@ void printValue(Object value) {
       printValue(value[k]);
     }
     stdout.write(']');
+  } else if (value is Map) {
+    stdout.write('[');
+    final entries = value.entries.toList();
+    for (var k = 0; k < entries.length; k++) {
+      if (k > 0) stdout.write(', ');
+      printValue(entries[k].key);
+      stdout.write(': ');
+      printValue(entries[k].value);
+    }
+    stdout.write(']');
   } else {
     printObject(value);
   }

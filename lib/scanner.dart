@@ -13,6 +13,7 @@ enum TokenType {
   SEMICOLON,
   SLASH,
   STAR,
+  COLUMN,
 
   // One or two Stringacter tokens.
   BANG,
@@ -299,12 +300,13 @@ class Scanner {
       case '>':
         return makeToken(
             match('=') ? TokenType.GREATER_EQUAL : TokenType.GREATER);
-
       case '"':
         return string();
+      case ':':
+        return makeToken(TokenType.COLUMN);
     }
 
-    return errorToken('Unexpected Stringacter.');
+    return errorToken('Unexpected character: $c.');
   }
 }
 

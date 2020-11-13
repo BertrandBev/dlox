@@ -27,7 +27,7 @@ void runFile(String path) {
 
 void main(List<String> args) {
   // initVM();
-  args = ['examples/array.lox'];
+  args = ['examples/map.lox'];
 
   if (args.isEmpty) {
     repl();

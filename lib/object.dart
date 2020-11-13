@@ -96,6 +96,6 @@ void printObject(Object value) {
   } else if (value is ObjUpvalue) {
     stdout.write('upvalue');
   } else {
-    stderr.writeln('Unsupported object type: $value');
+    stderr.write('<Unsupported object type: $value>');
   }
 }

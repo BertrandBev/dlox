@@ -5,7 +5,6 @@ import 'package:dlox/object.dart';
 import 'package:dlox/value.dart';
 import 'package:sprintf/sprintf.dart';
 
-
 void disassembleChunk(Chunk chunk, String name) {
   stdout.write(sprintf('== %s ==\n', [name]));
 
@@ -22,7 +21,7 @@ int constantInstruction(String name, Chunk chunk, int offset) {
   return offset + 2;
 }
 
-int arrayInitInstruction(String name, Chunk chunk, int offset) {
+int initializerListInstruction(String name, Chunk chunk, int offset) {
   final nArgs = chunk.code[offset + 1];
   stdout.writeln(sprintf('%-16s %4d', [name, nArgs]));
   return offset + 2;
@@ -155,12 +154,14 @@ int disassembleInstruction(Chunk chunk, int offset) {
       return simpleInstruction('OP_INHERIT', offset);
     case OpCode.METHOD:
       return constantInstruction('OP_METHOD', chunk, offset);
-    case OpCode.ARRAY_INIT:
-      return arrayInitInstruction('OP_ARRAY_INIT', chunk, offset);
-    case OpCode.ARRAY_GET:
-      return simpleInstruction('OP_ARRAY_GET', offset);
-    case OpCode.ARRAY_SET:
-      return simpleInstruction('OP_ARRAY_SET', offset);
+    case OpCode.LIST_INIT:
+      return initializerListInstruction('OP_LIST_INIT', chunk, offset);
+    case OpCode.CONTAINER_GET:
+      return simpleInstruction('OP_CONTAINER_GET', offset);
+    case OpCode.CONTAINER_SET:
+      return simpleInstruction('OP_CONTAINER_SET', offset);
+    case OpCode.MAP_INIT:
+      return initializerListInstruction('OP_MAP_INIT', chunk, offset);
     default:
       print('Unknown opcode $instruction');
       return offset + 1;

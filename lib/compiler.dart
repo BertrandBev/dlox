@@ -68,7 +68,7 @@ class ClassCompiler {
 }
 
 class Compiler {
-  // TODO: create wrapper (TODO: abstract those fields out)
+  // TODO: create wrapper
   static Parser parser;
   static ClassCompiler currentClass;
 
@@ -350,14 +350,14 @@ class Compiler {
     emitBytes(OpCode.CALL.index, argCount);
   }
 
-  void arrayIndex(bool canAssign) {
+  void listIndex(bool canAssign) {
     expression();
-    consume(TokenType.RIGHT_BRACK, "Expect ']' after array indexing.");
+    consume(TokenType.RIGHT_BRACK, "Expect ']' after list indexing.");
     if (canAssign && match(TokenType.EQUAL)) {
       expression();
-      emitOp(OpCode.ARRAY_SET);
+      emitOp(OpCode.CONTAINER_SET);
     } else {
-      emitOp(OpCode.ARRAY_GET);
+      emitOp(OpCode.CONTAINER_GET);
     }
   }
 
@@ -397,7 +397,7 @@ class Compiler {
     consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
   }
 
-  void arrayInit(bool canAssign) {
+  void listInit(bool canAssign) {
     var valCount = 0;
     if (!check(TokenType.RIGHT_BRACK)) {
       do {
@@ -405,8 +405,22 @@ class Compiler {
         valCount++;
       } while (match(TokenType.COMMA));
     }
-    consume(TokenType.RIGHT_BRACK, "Expect ']' after array initializer.");
-    emitBytes(OpCode.ARRAY_INIT.index, valCount);
+    consume(TokenType.RIGHT_BRACK, "Expect ']' after list initializer.");
+    emitBytes(OpCode.LIST_INIT.index, valCount);
+  }
+
+  void mapInit(bool canAssign) {
+    var valCount = 0;
+    if (!check(TokenType.RIGHT_BRACE)) {
+      do {
+        expression();
+        consume(TokenType.COLUMN, "Expect ':' between map key-value pairs");
+        expression();
+        valCount++;
+      } while (match(TokenType.COMMA));
+    }
+    consume(TokenType.RIGHT_BRACE, "Expect '}' after map initializer.");
+    emitBytes(OpCode.MAP_INIT.index, valCount);
   }
 
   void number(bool canAssign) {
@@ -508,9 +522,9 @@ class Compiler {
   Map<TokenType, ParseRule> get rules => {
         TokenType.LEFT_PAREN: ParseRule(grouping, call, Precedence.CALL),
         TokenType.RIGHT_PAREN: ParseRule(null, null, Precedence.NONE),
-        TokenType.LEFT_BRACE: ParseRule(null, null, Precedence.NONE),
+        TokenType.LEFT_BRACE: ParseRule(mapInit, null, Precedence.NONE),
         TokenType.RIGHT_BRACE: ParseRule(null, null, Precedence.NONE),
-        TokenType.LEFT_BRACK: ParseRule(arrayInit, arrayIndex, Precedence.CALL),
+        TokenType.LEFT_BRACK: ParseRule(listInit, listIndex, Precedence.CALL),
         TokenType.RIGHT_BRACK: ParseRule(null, null, Precedence.NONE),
         TokenType.COMMA: ParseRule(null, null, Precedence.NONE),
         TokenType.DOT: ParseRule(null, dot, Precedence.CALL),
@@ -519,6 +533,7 @@ class Compiler {
         TokenType.SEMICOLON: ParseRule(null, null, Precedence.NONE),
         TokenType.SLASH: ParseRule(null, binary, Precedence.FACTOR),
         TokenType.STAR: ParseRule(null, binary, Precedence.FACTOR),
+        TokenType.COLUMN: ParseRule(null, null, Precedence.NONE),
         TokenType.BANG: ParseRule(unary, null, Precedence.NONE),
         TokenType.BANG_EQUAL: ParseRule(null, binary, Precedence.EQUALITY),
         TokenType.EQUAL: ParseRule(null, null, Precedence.NONE),
