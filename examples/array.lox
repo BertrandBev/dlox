@@ -1,0 +1,11 @@
+var a = [3, 1];
+print "Array";
+print a;
+print "Access";
+print a[0];
+print a[1];
+print "Setter";
+a[0] = 30;
+a[1] = 10;
+print "Array modified (doubled)";
+print a + a;

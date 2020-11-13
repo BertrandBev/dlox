@@ -350,6 +350,17 @@ class Compiler {
     emitBytes(OpCode.CALL.index, argCount);
   }
 
+  void arrayIndex(bool canAssign) {
+    expression();
+    consume(TokenType.RIGHT_BRACK, "Expect ']' after array indexing.");
+    if (canAssign && match(TokenType.EQUAL)) {
+      expression();
+      emitOp(OpCode.ARRAY_SET);
+    } else {
+      emitOp(OpCode.ARRAY_GET);
+    }
+  }
+
   void dot(bool canAssign) {
     consume(TokenType.IDENTIFIER, "Expect property name after '.'.");
     var name = identifierConstant(parser.previous);
@@ -384,6 +395,18 @@ class Compiler {
   void grouping(bool canAssign) {
     expression();
     consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
+  }
+
+  void arrayInit(bool canAssign) {
+    var valCount = 0;
+    if (!check(TokenType.RIGHT_BRACK)) {
+      do {
+        expression();
+        valCount++;
+      } while (match(TokenType.COMMA));
+    }
+    consume(TokenType.RIGHT_BRACK, "Expect ']' after array initializer.");
+    emitBytes(OpCode.ARRAY_INIT.index, valCount);
   }
 
   void number(bool canAssign) {
@@ -487,6 +510,8 @@ class Compiler {
         TokenType.RIGHT_PAREN: ParseRule(null, null, Precedence.NONE),
         TokenType.LEFT_BRACE: ParseRule(null, null, Precedence.NONE),
         TokenType.RIGHT_BRACE: ParseRule(null, null, Precedence.NONE),
+        TokenType.LEFT_BRACK: ParseRule(arrayInit, arrayIndex, Precedence.CALL),
+        TokenType.RIGHT_BRACK: ParseRule(null, null, Precedence.NONE),
         TokenType.COMMA: ParseRule(null, null, Precedence.NONE),
         TokenType.DOT: ParseRule(null, dot, Precedence.CALL),
         TokenType.MINUS: ParseRule(unary, binary, Precedence.TERM),

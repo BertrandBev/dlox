@@ -200,7 +200,6 @@ class VM {
   }
 
   // Repace macros (slower -> try inlining)
-
   int readByte(CallFrame frame) {
     return frame.chunk.code[frame.ip++];
   }
@@ -224,6 +223,19 @@ class VM {
       return false;
     }
     return true;
+  }
+
+  int checkIndex(List arr, Object idxObj) {
+    if (!(idxObj is double)) {
+      runtimeError('Array index must be a number.');
+      return null;
+    }
+    final idx = (idxObj as double).toInt();
+    if (idx < 0 || idx >= arr.length) {
+      runtimeError('Array index out of bounds.');
+      return null;
+    }
+    return idx;
   }
 
   InterpretResult run() {
@@ -409,8 +421,10 @@ class VM {
               push(a + b);
             } else if ((a is String) && (b is String)) {
               push(a + b);
+            } else if ((a is List) && (b is List)) {
+              push(a + b);
             } else {
-              runtimeError('Operands must be two numbers or two strings.');
+              runtimeError('Operands must numbers, strings or arrays.');
               return InterpretResult.RUNTIME_ERROR;
             }
             break;
@@ -574,6 +588,36 @@ class VM {
         case OpCode.METHOD:
           defineMethod(readString(frame));
           break;
+
+        case OpCode.ARRAY_INIT:
+          final valCount = readByte(frame);
+          final arr = [];
+          for (var k = 0; k < valCount; k++) {
+            arr.add(peek(valCount - k - 1));
+          }
+          stackTop -= valCount;
+          push(arr);
+          break;
+
+        case OpCode.ARRAY_GET:
+          {
+            final idxObj = pop();
+            final arr = pop() as List;
+            final idx = checkIndex(arr, idxObj);
+            push(arr[idx]);
+            break;
+          }
+
+        case OpCode.ARRAY_SET:
+          {
+            final val = pop();
+            final idxObj = pop();
+            final arr = pop() as List;
+            final idx = checkIndex(arr, idxObj);
+            arr[idx] = val;
+            push(val);
+            break;
+          }
       }
     }
   }

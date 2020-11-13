@@ -22,6 +22,12 @@ int constantInstruction(String name, Chunk chunk, int offset) {
   return offset + 2;
 }
 
+int arrayInitInstruction(String name, Chunk chunk, int offset) {
+  final nArgs = chunk.code[offset + 1];
+  stdout.writeln(sprintf('%-16s %4d', [name, nArgs]));
+  return offset + 2;
+}
+
 int invokeInstruction(String name, Chunk chunk, int offset) {
   final constant = chunk.code[offset + 1];
   final argCount = chunk.code[offset + 2];
@@ -149,6 +155,12 @@ int disassembleInstruction(Chunk chunk, int offset) {
       return simpleInstruction('OP_INHERIT', offset);
     case OpCode.METHOD:
       return constantInstruction('OP_METHOD', chunk, offset);
+    case OpCode.ARRAY_INIT:
+      return arrayInitInstruction('OP_ARRAY_INIT', chunk, offset);
+    case OpCode.ARRAY_GET:
+      return simpleInstruction('OP_ARRAY_GET', offset);
+    case OpCode.ARRAY_SET:
+      return simpleInstruction('OP_ARRAY_SET', offset);
     default:
       print('Unknown opcode $instruction');
       return offset + 1;

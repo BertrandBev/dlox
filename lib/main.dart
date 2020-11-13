@@ -27,7 +27,7 @@ void runFile(String path) {
 
 void main(List<String> args) {
   // initVM();
-  args = ['examples/binary_trees.lox'];
+  args = ['examples/array.lox'];
 
   if (args.isEmpty) {
     repl();

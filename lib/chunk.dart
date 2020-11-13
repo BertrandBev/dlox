@@ -35,7 +35,10 @@ enum OpCode {
   RETURN,
   CLASS,
   INHERIT,
-  METHOD
+  METHOD,
+  ARRAY_INIT,
+  ARRAY_GET,
+  ARRAY_SET,
 }
 
 class Chunk {

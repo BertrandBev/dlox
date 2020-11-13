@@ -11,6 +11,15 @@ void printValue(Object value) {
     stdout.write('nil');
   } else if (value is double) {
     stdout.write(sprintf('%g', [value]));
+  } else if (value is String) {
+    stdout.write(value);
+  } else if (value is List) {
+    stdout.write('[');
+    for (var k = 0; k < value.length; k++) {
+      if (k > 0) stdout.write(', ');
+      printValue(value[k]);
+    }
+    stdout.write(']');
   } else {
     printObject(value);
   }

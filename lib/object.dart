@@ -93,8 +93,6 @@ void printObject(Object value) {
     stdout.write('${value.klass.name} instance');
   } else if (value is ObjNative) {
     stdout.write('<native fn>');
-  } else if (value is String) {
-    stdout.write(value);
   } else if (value is ObjUpvalue) {
     stdout.write('upvalue');
   } else {

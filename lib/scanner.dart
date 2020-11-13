@@ -4,6 +4,8 @@ enum TokenType {
   RIGHT_PAREN,
   LEFT_BRACE,
   RIGHT_BRACE,
+  LEFT_BRACK,
+  RIGHT_BRACK,
   COMMA,
   DOT,
   MINUS,
@@ -266,6 +268,10 @@ class Scanner {
         return makeToken(TokenType.LEFT_PAREN);
       case ')':
         return makeToken(TokenType.RIGHT_PAREN);
+      case '[':
+        return makeToken(TokenType.LEFT_BRACK);
+      case ']':
+        return makeToken(TokenType.RIGHT_BRACK);
       case '{':
         return makeToken(TokenType.LEFT_BRACE);
       case '}':
