@@ -5,6 +5,7 @@ import 'package:dlox/chunk.dart';
 import 'package:dlox/common.dart';
 import 'package:dlox/compiler.dart';
 import 'package:dlox/debug.dart';
+import 'package:dlox/native.dart';
 import 'package:dlox/object.dart';
 import 'package:dlox/table.dart';
 import 'package:dlox/value.dart';
@@ -22,10 +23,6 @@ class CallFrame {
 }
 
 enum InterpretResult { OK, COMPILE_ERROR, RUNTIME_ERROR }
-
-double clockNative(List<Object> stack, int argIdx, int argCount) {
-  return DateTime.now().millisecondsSinceEpoch.toDouble();
-}
 
 class VM {
   List<CallFrame> frames = List<CallFrame>(FRAMES_MAX);
@@ -127,8 +124,26 @@ class VM {
     return call(method as ObjClosure, argCount);
   }
 
+  bool invokeList(List list, String name, int argCount) {
+    if (!LIST_NATIVE_FUNCTIONS.containsKey(name)) {
+      runtimeError('Unknown method for list');
+      return false;
+    }
+    final function = LIST_NATIVE_FUNCTIONS[name];
+    try {
+      final rtn = function(list, stack, stackTop - argCount, argCount);
+      stackTop -= argCount + 1;
+      push(rtn);
+      return true;
+    } on NativeError catch (e) {
+      runtimeError(e.format, e.args);
+      return false;
+    }
+  }
+
   bool invoke(String name, int argCount) {
     final receiver = peek(argCount);
+    if (receiver is List) return invokeList(receiver, name, argCount);
     if (!(receiver is ObjInstance)) {
       runtimeError('Only instances have methods.');
       return false;
