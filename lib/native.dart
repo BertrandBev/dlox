@@ -41,46 +41,99 @@ void argTypeError(int index, ArgType expected, ArgType received) {
       [index + 1, ARG_STR[expected], ARG_STR[received]]);
 }
 
+// Native functions
+
 double clockNative(List<Object> stack, int argIdx, int argCount) {
   if (argCount != 0) argCountError(0, argCount);
   return DateTime.now().millisecondsSinceEpoch.toDouble();
 }
 
+// List native functions
+
+double listLength(List list, List<Object> stack, int argIdx, int argCount) {
+  if (argCount != 0) argCountError(0, argCount);
+  return list.length.toDouble();
+}
+
+void listAdd(List list, List<Object> stack, int argIdx, int argCount) {
+  if (argCount != 1) argCountError(1, argCount);
+  final arg_0 = stack[argIdx];
+  list.add(arg_0);
+}
+
+void listInsert(List list, List<Object> stack, int argIdx, int argCount) {
+  if (argCount != 2) argCountError(2, argCount);
+  final arg_0 = stack[argIdx];
+  if (!(arg_0 is double)) argTypeError(0, ArgType.Number, valueType(arg_0));
+  final arg_1 = stack[argIdx + 1];
+  final idx = (arg_0 as double).toInt();
+  if (idx < 0 || idx > list.length) {
+    throw NativeError('Index %d out of bounds [0, %d]', [idx, list.length]);
+  }
+  list.insert(idx, arg_1);
+}
+
+Object listRemove(List list, List<Object> stack, int argIdx, int argCount) {
+  if (argCount != 1) argCountError(1, argCount);
+  final arg_0 = stack[argIdx];
+  if (!(arg_0 is double)) argTypeError(0, ArgType.Number, valueType(arg_0));
+  final idx = (arg_0 as double).toInt();
+  if (idx < 0 || idx > list.length) {
+    throw NativeError('Index %d out of bounds [0, %d]', [idx, list.length]);
+  }
+  return list.removeAt(idx);
+}
+
+Object listPop(List list, List<Object> stack, int argIdx, int argCount) {
+  if (argCount != 0) argCountError(0, argCount);
+  return list.removeLast();
+}
+
+void listClear(List list, List<Object> stack, int argIdx, int argCount) {
+  if (argCount != 0) argCountError(0, argCount);
+  list.clear();
+}
+
 typedef ListNativeFunction = Object Function(
     List list, List<Object> stack, int argIdx, int argCount);
 
-class ListNative {
-  static void add(List list, List<Object> stack, int argIdx, int argCount) {
-    if (argCount != 1) argCountError(1, argCount);
-    final arg_0 = stack[argIdx];
-    list.add(arg_0);
-  }
+const LIST_NATIVE_FUNCTIONS = <String, ListNativeFunction>{
+  'add': listAdd,
+  'insert': listInsert,
+  'remove': listRemove,
+  'pop': listPop,
+  'clear': listClear,
+};
 
-  static void insert(List list, List<Object> stack, int argIdx, int argCount) {
-    if (argCount != 2) argCountError(2, argCount);
-    final arg_0 = stack[argIdx];
-    if (!(arg_0 is double)) argTypeError(0, ArgType.Number, valueType(arg_0));
-    final arg_1 = stack[argIdx + 1];
-    list.insert((arg_0 as double).toInt(), arg_1);
-  }
+// Map native functions
 
-  static Object remove(
-      List list, List<Object> stack, int argIdx, int argCount) {
-    if (argCount != 1) argCountError(1, argCount);
-    final arg_0 = stack[argIdx];
-    if (!(arg_0 is double)) argTypeError(0, ArgType.Number, valueType(arg_0));
-    return list.removeAt((arg_0 as double).toInt());
-  }
-
-  static void clear(List list, List<Object> stack, int argIdx, int argCount) {
-    if (argCount != 0) argCountError(0, argCount);
-    list.clear();
-  }
+double mapLength(Map map, List<Object> stack, int argIdx, int argCount) {
+  if (argCount != 0) argCountError(0, argCount);
+  return map.length.toDouble();
 }
 
-const LIST_NATIVE_FUNCTIONS = <String, ListNativeFunction>{
-  'add': ListNative.add,
-  'insert': ListNative.insert,
-  'remove': ListNative.remove,
-  'clear': ListNative.clear,
+List mapKeys(Map map, List<Object> stack, int argIdx, int argCount) {
+  if (argCount != 0) argCountError(0, argCount);
+  return map.keys.toList();
+}
+
+List mapValues(Map map, List<Object> stack, int argIdx, int argCount) {
+  if (argCount != 0) argCountError(0, argCount);
+  return map.values.toList();
+}
+
+bool mapHas(Map map, List<Object> stack, int argIdx, int argCount) {
+  if (argCount != 1) argCountError(1, argCount);
+  final arg_0 = stack[argIdx];
+  return map.containsKey(arg_0);
+}
+
+typedef MapNativeFunction = Object Function(
+    Map list, List<Object> stack, int argIdx, int argCount);
+
+const MAP_NATIVE_FUNCTIONS = <String, MapNativeFunction>{
+  'length': mapLength,
+  'keys': mapKeys,
+  'values': mapValues,
+  'has': mapHas,
 };

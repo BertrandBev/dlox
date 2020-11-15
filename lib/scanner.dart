@@ -47,6 +47,7 @@ enum TokenType {
   TRUE,
   VAR,
   WHILE,
+  IN,
 
   ERROR,
   EOF
@@ -184,7 +185,15 @@ class Scanner {
         }
         break;
       case 'i':
-        return checkKeyword(1, 1, 'f', TokenType.IF);
+        if (current - start > 1) {
+          switch (charAt(start + 1)) {
+            case 'f':
+              return TokenType.IF;
+            case 'n':
+              return TokenType.IN;
+          }
+        }
+        break;
       case 'n':
         return checkKeyword(1, 2, 'il', TokenType.NIL);
       case 'o':

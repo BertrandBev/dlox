@@ -156,12 +156,12 @@ int disassembleInstruction(Chunk chunk, int offset) {
       return constantInstruction('OP_METHOD', chunk, offset);
     case OpCode.LIST_INIT:
       return initializerListInstruction('OP_LIST_INIT', chunk, offset);
+    case OpCode.MAP_INIT:
+      return initializerListInstruction('OP_MAP_INIT', chunk, offset);
     case OpCode.CONTAINER_GET:
       return simpleInstruction('OP_CONTAINER_GET', offset);
     case OpCode.CONTAINER_SET:
       return simpleInstruction('OP_CONTAINER_SET', offset);
-    case OpCode.MAP_INIT:
-      return initializerListInstruction('OP_MAP_INIT', chunk, offset);
     default:
       print('Unknown opcode $instruction');
       return offset + 1;

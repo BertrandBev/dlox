@@ -124,9 +124,26 @@ class VM {
     return call(method as ObjClosure, argCount);
   }
 
+  bool invokeMap(Map map, String name, int argCount) {
+    if (!MAP_NATIVE_FUNCTIONS.containsKey(name)) {
+      runtimeError('Unknown method for map.');
+      return false;
+    }
+    final function = MAP_NATIVE_FUNCTIONS[name];
+    try {
+      final rtn = function(map, stack, stackTop - argCount, argCount);
+      stackTop -= argCount + 1;
+      push(rtn);
+      return true;
+    } on NativeError catch (e) {
+      runtimeError(e.format, e.args);
+      return false;
+    }
+  }
+
   bool invokeList(List list, String name, int argCount) {
     if (!LIST_NATIVE_FUNCTIONS.containsKey(name)) {
-      runtimeError('Unknown method for list');
+      runtimeError('Unknown method for list.');
       return false;
     }
     final function = LIST_NATIVE_FUNCTIONS[name];
@@ -144,6 +161,7 @@ class VM {
   bool invoke(String name, int argCount) {
     final receiver = peek(argCount);
     if (receiver is List) return invokeList(receiver, name, argCount);
+    if (receiver is Map) return invokeMap(receiver, name, argCount);
     if (!(receiver is ObjInstance)) {
       runtimeError('Only instances have methods.');
       return false;
@@ -614,6 +632,16 @@ class VM {
           push(arr);
           break;
 
+        case OpCode.MAP_INIT:
+          final valCount = readByte(frame);
+          final map = {};
+          for (var k = 0; k < valCount; k++) {
+            map[peek(valCount - 2 * k + 1)] = peek(valCount - 2 * k);
+          }
+          stackTop -= 2 * valCount;
+          push(map);
+          break;
+
         case OpCode.CONTAINER_GET:
           {
             final idxObj = pop();
@@ -647,16 +675,6 @@ class VM {
             push(val);
             break;
           }
-
-        case OpCode.MAP_INIT:
-          final valCount = readByte(frame);
-          final map = {};
-          for (var k = 0; k < valCount; k++) {
-            map[peek(valCount - 2 * k - 1)] = peek(valCount - 2 * k - 2);
-          }
-          stackTop -= 2 * valCount;
-          push(map);
-          break;
       }
     }
   }

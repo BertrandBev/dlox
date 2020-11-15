@@ -37,9 +37,9 @@ enum OpCode {
   INHERIT,
   METHOD,
   LIST_INIT,
+  MAP_INIT,
   CONTAINER_GET,
   CONTAINER_SET,
-  MAP_INIT,
 }
 
 class Chunk {
