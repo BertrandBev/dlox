@@ -1,0 +1,19 @@
+class A {
+  fun method(arg) {
+    print "A.method(" + arg + ")";
+  }
+}
+
+class B < A {
+  fun getClosure() {
+    return super.method;
+  }
+
+  fun method(arg) {
+    print "B.method(" + arg + ")";
+  }
+}
+
+
+var closure = B().getClosure();
+closure("arg"); // expect: A.method(arg)

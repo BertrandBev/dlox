@@ -1,0 +1,22 @@
+class Base {
+  fun method() {
+    print "Base.method()";
+  }
+}
+
+class Derived < Base {
+  fun method() {
+    super.method();
+  }
+}
+
+class OtherBase {
+  fun method() {
+    print "OtherBase.method()";
+  }
+}
+
+var derived = Derived();
+derived.method(); // expect: Base.method()
+Base = OtherBase;
+derived.method(); // expect: Base.method()

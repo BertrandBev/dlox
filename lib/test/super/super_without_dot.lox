@@ -1,0 +1,7 @@
+class A {}
+
+class B < A {
+  fun method() {
+    super; // Error at ';': Expect '.' after 'super'.
+  }
+}

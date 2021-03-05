@@ -1,0 +1,1 @@
+var this = "value"; // Error at 'this': Expect variable name.

@@ -1,0 +1,2 @@
+if (true) "ok"; else var foo; // Error at 'var': Expect expression.
+

@@ -1,0 +1,13 @@
+class Foo {
+  fun getClosure() {
+    fun closure() {
+      return this.toString();
+    }
+    return closure;
+  }
+
+  fun toString() { return "Foo"; }
+}
+
+var closure = Foo().getClosure();
+print closure(); // expect: Foo

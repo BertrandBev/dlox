@@ -1,0 +1,2 @@
+fun f() 123; // Error at '123': Expect function body.
+// Error at end: Unterminated block

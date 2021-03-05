@@ -1,0 +1,7 @@
+class Foo {
+  fun method() {
+    print method; // expect runtime error: Undefined variable 'method'.
+  }
+}
+
+Foo().method();

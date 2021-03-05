@@ -1,0 +1,2 @@
+for (;;) var foo; // Error at 'var': Expect expression.
+

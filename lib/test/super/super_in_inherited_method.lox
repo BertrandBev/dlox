@@ -1,0 +1,23 @@
+class A {
+  fun say() {
+    print "A";
+  }
+}
+
+class B < A {
+  fun test() {
+    super.say();
+  }
+
+  fun say() {
+    print "B";
+  }
+}
+
+class C < B {
+  fun say() {
+    print "C";
+  }
+}
+
+C().test(); // expect: A

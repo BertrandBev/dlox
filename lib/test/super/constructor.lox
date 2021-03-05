@@ -1,0 +1,16 @@
+class Base {
+  fun init(a, b) {
+    print "Base.init(" + a + ", " + b + ")";
+  }
+}
+
+class Derived < Base {
+  fun init() {
+    print "Derived.init()";
+    super.init("a", "b");
+  }
+}
+
+Derived();
+// expect: Derived.init()
+// expect: Base.init(a, b)

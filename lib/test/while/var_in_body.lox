@@ -1,0 +1,2 @@
+while (true) var foo; // Error at 'var': Expect expression.
+

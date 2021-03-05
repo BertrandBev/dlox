@@ -1,0 +1,18 @@
+class A {
+  fun foo() {
+    print "A.foo()";
+  }
+}
+
+class B < A {}
+
+class C < B {
+  fun foo() {
+    print "C.foo()";
+    super.foo();
+  }
+}
+
+C().foo();
+// expect: C.foo()
+// expect: A.foo()

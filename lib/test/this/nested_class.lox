@@ -1,0 +1,20 @@
+class Outer {
+  fun method() {
+    print this; // expect: Outer instance
+
+    fun f() {
+      print this; // expect: Outer instance
+
+      class Inner {
+        fun method() {
+          print this; // expect: Inner instance
+        }
+      }
+
+      Inner().method();
+    }
+    f();
+  }
+}
+
+Outer().method();

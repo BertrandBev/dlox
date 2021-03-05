@@ -1,0 +1,14 @@
+class A {
+  fun init(param) {
+    this.field = param;
+  }
+
+  fun test() {
+    print this.field;
+  }
+}
+
+class B < A {}
+
+var b = B("value");
+b.test(); // expect: value

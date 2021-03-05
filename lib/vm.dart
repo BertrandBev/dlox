@@ -34,6 +34,8 @@ class VM {
   String initString;
   ObjUpvalue openUpvalues;
   Object objects;
+  bool silent = true;
+  final stdout = StringBuffer();
 
   VM() {
     resetStack();

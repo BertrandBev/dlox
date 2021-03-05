@@ -873,7 +873,7 @@ class Compiler {
   }
 
   // STATIC FIELD METHODS
-  static ObjFunction compile(String source) {
+  static ObjFunction compile(String source, { bool silent = false }) {
     scanner = Scanner(source);
     // Print scanner result
 
