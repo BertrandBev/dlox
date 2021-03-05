@@ -1,25 +1,25 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:dlox/scanner.dart';
 import 'package:dlox/vm.dart';
 import 'package:path/path.dart';
 
 import 'compiler.dart';
 
-main() async {
+void main() async {
   Test.run();
 }
 
 class Test {
-  final vm = VM();
+  final syncVM = SyncVM(silent: true);
 
   static void run() {
     Test._();
   }
 
   Test._() {
-    vm.silent = true;
     runAllDirs();
-    // runFile(File('./test/constructor/return_value.lox'));
+    // runFile(File("./test/constructor/return_value.lox"));
   }
 
   Future<List<FileSystemEntity>> dirContents(Directory dir) {
@@ -61,13 +61,13 @@ class Test {
 
     // Create line map
     final lineNumber = <int>[];
-    for (int k = 0, line = 0; k < source.length; k++) {
+    for (var k = 0, line = 0; k < source.length; k++) {
       if (source[k] == '\n') line += 1;
       lineNumber.add(line);
     }
 
     // Extract static error reqs
-    final errExp = new RegExp(r'// Error at (.+):(.+)');
+    final errExp = RegExp(r'// Error at (.+):(.+)');
     final errMatches = errExp.allMatches(source);
     final errRef = errMatches.map((e) {
       final line = lineNumber[e.start];
@@ -91,14 +91,15 @@ class Test {
     if (errList.isNotEmpty) return true;
 
     // Run test
-    vm.stdout.clear();
-    vm.interpret(source);
+    syncVM.vm.stdout.clear();
+    syncVM.setFunctionParams(result, FunctionParams());
+    syncVM.run();
 
     // Extract test reqs
-    final rtnExp = RegExp(r'// expect: (.+)');
+    var rtnExp = RegExp(r'// expect: (.+)');
     final rtnMatches = rtnExp.allMatches(source);
     final stdoutRef = rtnMatches.map((e) => e.group(1)).toList();
-    final stdout = vm.stdout
+    final stdout = syncVM.vm.stdout
         .toString()
         .trim()
         .split('\n')

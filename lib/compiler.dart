@@ -1,22 +1,16 @@
-import 'dart:io';
-
 import 'package:dlox/chunk.dart';
 import 'package:dlox/common.dart';
 import 'package:dlox/debug.dart';
+import 'package:dlox/error.dart';
 import 'package:dlox/object.dart';
+import 'package:dlox/parser.dart';
 import 'package:dlox/scanner.dart';
-import 'package:sprintf/sprintf.dart';
+import 'package:dlox/value.dart';
 
+// TODO: Optimisation - bump
 const UINT8_COUNT = 256;
 const UINT8_MAX = UINT8_COUNT - 1;
 const UINT16_MAX = 65535;
-
-class Parser {
-  Token current;
-  Token previous;
-  bool hadError;
-  bool panicMode;
-}
 
 enum Precedence {
   NONE,
@@ -26,7 +20,8 @@ enum Precedence {
   EQUALITY, // == !=
   COMPARISON, // < > <= >=
   TERM, // + -
-  FACTOR, // * /
+  FACTOR, // * / %
+  POWER, // ^
   UNARY, // ! -
   CALL, // . ()
   PRIMARY
@@ -43,18 +38,23 @@ class ParseRule {
 }
 
 class Local {
-  Token name;
-  int depth = 0;
+  final Token name;
+  int depth;
   bool isCaptured = false;
 
-  Local(this.name, {this.depth = 0, this.isCaptured = false});
+  Local(this.name, {this.depth = -1, this.isCaptured = false});
+
+  bool get initialized {
+    return depth >= 0;
+  }
 }
 
 class Upvalue {
+  Token name;
   int index;
   bool isLocal;
 
-  Upvalue(this.index, this.isLocal);
+  Upvalue(this.name, this.index, this.isLocal);
 }
 
 enum FunctionType { FUNCTION, INITIALIZER, METHOD, SCRIPT }
@@ -67,39 +67,65 @@ class ClassCompiler {
   ClassCompiler(this.enclosing, this.name, this.hasSuperclass);
 }
 
+class CompilerResult {
+  final ObjFunction function;
+  final Tracer tracer;
+  final List<CompilerError> errors;
+
+  CompilerResult(this.function, this.tracer, this.errors);
+}
+
 class Compiler {
-  // TODO: create wrapper
-  static Parser parser;
-  static ClassCompiler currentClass;
-
-  //
-  Compiler enclosing;
-  ObjFunction function = ObjFunction();
+  final Compiler enclosing;
+  Parser parser;
+  ClassCompiler currentClass;
+  ObjFunction function;
   FunctionType type;
-
-  List<Local> locals = <Local>[];
-  List<Upvalue> upvalues = <Upvalue>[];
-  // int localCount = 0;
+  final List<Local> locals = [];
+  final List<Upvalue> upvalues = [];
   int scopeDepth = 0;
+  // Degug tracer
+  Tracer tracer;
 
-  Compiler(this.type, [Compiler parent]) {
-    enclosing = parent;
+  Compiler._(this.type, {this.parser, this.enclosing}) {
+    function = ObjFunction();
+    if (enclosing != null) {
+      assert(parser == null);
+      parser = enclosing.parser;
+      tracer = enclosing.tracer;
+      currentClass = enclosing.currentClass;
+      scopeDepth = this.enclosing.scopeDepth + 1;
+    } else {
+      assert(parser != null);
+      tracer = Tracer();
+    }
 
     if (type != FunctionType.SCRIPT) {
       function.name = parser.previous.str;
     }
 
     final str = type != FunctionType.FUNCTION ? 'this' : '';
-    final name = Token(TokenType.FUN, str, 0, 0);
-    locals.add(Local(name));
+    final name = Token(TokenType.FUN, str: str);
+    locals.add(Local(name, depth: 0));
+  }
+
+  static CompilerResult compile(List<Token> tokens, {bool silent = false}) {
+    // Compile script
+    final parser = Parser(tokens, silent: silent);
+    final compiler = Compiler._(FunctionType.SCRIPT, parser: parser);
+    parser.advance();
+    while (!compiler.match(TokenType.EOF)) {
+      compiler.declaration();
+    }
+    final function = compiler.endCompiler();
+    parser.errors.addAll(compiler.tracer.finalize(false));
+    return CompilerResult(function, compiler.tracer, parser.errors);
   }
 
   ObjFunction endCompiler() {
     emitReturn();
-    if (DEBUG_PRINT_CODE) {
-      if (!parser.hadError) {
-        disassembleChunk(currentChunk, function.name ?? '<script>');
-      }
+    if (DEBUG_PRINT_CODE && parser.errors.isEmpty) {
+      disassembleChunk(currentChunk, function.name ?? '<script>');
     }
     return function;
   }
@@ -108,12 +134,33 @@ class Compiler {
     return function.chunk;
   }
 
+  void consume(TokenType type, String message) {
+    tracer.onToken(parser.current, scopeDepth);
+    parser.consume(type, message);
+  }
+
+  bool match(TokenType type) {
+    final res = parser.match(type);
+    if (res) tracer.onToken(parser.current, scopeDepth);
+    return res;
+  }
+
+  bool matchPair(TokenType first, TokenType second) {
+    final res = parser.matchPair(first, second);
+    if (res) {
+      // Assumes that a pair of tokens never mutates the depth
+      tracer.onToken(parser.previous, scopeDepth);
+      tracer.onToken(parser.current, scopeDepth);
+    }
+    return res;
+  }
+
   void emitOp(OpCode op) {
     emitByte(op.index);
   }
 
   void emitByte(int byte) {
-    currentChunk.write(byte, parser.previous.line);
+    currentChunk.write(byte, parser.previous);
   }
 
   void emitBytes(int byte1, int byte2) {
@@ -124,7 +171,7 @@ class Compiler {
   void emitLoop(int loopStart) {
     emitOp(OpCode.LOOP);
     var offset = currentChunk.count - loopStart + 2;
-    if (offset > UINT16_MAX) error('Loop body too large.');
+    if (offset > UINT16_MAX) parser.error('Loop body too large');
     emitByte((offset >> 8) & 0xff);
     emitByte(offset & 0xff);
   }
@@ -149,7 +196,7 @@ class Compiler {
   int makeConstant(Object value) {
     var constant = currentChunk.addConstant(value);
     if (constant > UINT8_MAX) {
-      error('Too many constants in one chunk.');
+      parser.error('Too many constants in one chunk');
       return 0;
     }
     return constant;
@@ -163,7 +210,7 @@ class Compiler {
     // -2 to adjust for the bytecode for the jump offset itself.
     var jump = currentChunk.count - offset - 2;
     if (jump > UINT16_MAX) {
-      error('Too much code to jump over.');
+      parser.error('Too much code to jump over');
     }
     currentChunk.code[offset] = (jump >> 8) & 0xff;
     currentChunk.code[offset + 1] = jump & 0xff;
@@ -197,8 +244,8 @@ class Compiler {
     for (var i = locals.length - 1; i >= 0; i--) {
       var local = locals[i];
       if (identifiersEqual(name, local.name)) {
-        if (local.depth == -1) {
-          error('Can\'t read local variable in its own initializer.');
+        if (!local.initialized) {
+          parser.error('Can\'t read local variable in its own initializer');
         }
         return i;
       }
@@ -206,7 +253,7 @@ class Compiler {
     return -1;
   }
 
-  int addUpvalue(int index, bool isLocal) {
+  int addUpvalue(Token name, int index, bool isLocal) {
     assert(upvalues.length == function.upvalueCount);
     for (var i = 0; i < upvalues.length; i++) {
       var upvalue = upvalues[i];
@@ -215,36 +262,38 @@ class Compiler {
       }
     }
     if (upvalues.length == UINT8_COUNT) {
-      error('Too many closure variables in function.');
+      parser.error('Too many closure variables in function');
       return 0;
     }
-    upvalues.add(Upvalue(index, isLocal));
+    upvalues.add(Upvalue(name, index, isLocal));
     return function.upvalueCount++;
   }
 
   int resolveUpvalue(Token name) {
     if (enclosing == null) return -1;
-    var local = enclosing.resolveLocal(name);
-    if (local != -1) {
-      enclosing.locals[local].isCaptured = true;
-      return addUpvalue(local, true);
+    final localIdx = enclosing.resolveLocal(name);
+    if (localIdx != -1) {
+      final local = enclosing.locals[localIdx];
+      local.isCaptured = true;
+      return addUpvalue(local.name, localIdx, true);
     }
-    var upvalue = enclosing.resolveUpvalue(name);
-    if (upvalue != -1) {
-      return addUpvalue(upvalue, false);
+    final upvalueIdx = enclosing.resolveUpvalue(name);
+    if (upvalueIdx != -1) {
+      final upvalue = enclosing.upvalues[upvalueIdx];
+      return addUpvalue(upvalue.name, upvalueIdx, false);
     }
     return -1;
   }
 
   void addLocal(Token name) {
     if (locals.length >= UINT8_COUNT) {
-      error('Too many local variables in function.');
+      parser.error('Too many local variables in function');
       return;
     }
-    locals.add(Local(name, depth: -1, isCaptured: false));
+    locals.add(Local(name));
   }
 
-  void declareVariable() {
+  void delareLocalVariable() {
     // Global variables are implicitly declared.
     if (scopeDepth == 0) return;
     var name = parser.previous;
@@ -254,7 +303,7 @@ class Compiler {
         break; // [negative]
       }
       if (identifiersEqual(name, local.name)) {
-        error('Already variable with this name in this scope.');
+        parser.error('Already variable with this name in this scope');
       }
     }
     addLocal(name);
@@ -262,41 +311,56 @@ class Compiler {
 
   int parseVariable(String errorMessage) {
     consume(TokenType.IDENTIFIER, errorMessage);
-    declareVariable();
-    if (scopeDepth > 0) return 0;
-
-    return identifierConstant(parser.previous);
+    if (scopeDepth > 0) {
+      delareLocalVariable();
+      return 0;
+    } else {
+      return identifierConstant(parser.previous);
+    }
   }
 
-  void markInitialized() {
+  void markLocalVariableInitialized() {
     if (scopeDepth == 0) return;
     locals.last.depth = scopeDepth;
   }
 
-  void defineVariable(int global) {
-    if (scopeDepth > 0) {
-      markInitialized();
-      return;
+  void defineVariable(int global, {Token token, int peekDist = 0}) {
+    final isLocal = scopeDepth > 0;
+    if (isLocal) {
+      markLocalVariableInitialized();
+      final slotIdx = locals.length - 1 - peekDist;
+      emitBytes(OpCode.TRACER_DEFINE_LOCAL.index, slotIdx);
+    } else {
+      emitBytes(OpCode.DEFINE_GLOBAL.index, global);
     }
-    emitBytes(OpCode.DEFINE_GLOBAL.index, global);
+    if (token != null) {
+      // Variable definition
+      tracer.defineVariable(token, isLocal);
+      // if (isLocal)
+      // TODO: check if needed
+      currentChunk.setTraceEvent(TraceEvent(
+        token,
+        type: TraceEventType.VARIABLE_SET,
+      ));
+    }
   }
 
   int argumentList() {
     var argCount = 0;
-    if (!check(TokenType.RIGHT_PAREN)) {
+    if (!parser.check(TokenType.RIGHT_PAREN)) {
       do {
         expression();
         if (argCount == 255) {
-          error("Can't have more than 255 arguments.");
+          parser.error("Can't have more than 255 arguments");
         }
         argCount++;
       } while (match(TokenType.COMMA));
     }
-    consume(TokenType.RIGHT_PAREN, "Expect ')' after arguments.");
+    consume(TokenType.RIGHT_PAREN, "Expect ')' after arguments");
     return argCount;
   }
 
-  void and_(bool canAssign) {
+  void _and(bool canAssign) {
     var endJump = emitJump(OpCode.JUMP_IF_FALSE);
     emitOp(OpCode.POP);
     parsePrecedence(Precedence.AND);
@@ -340,20 +404,44 @@ class Compiler {
       case TokenType.SLASH:
         emitOp(OpCode.DIVIDE);
         break;
+      case TokenType.CARET:
+        emitOp(OpCode.POW);
+        break;
+      case TokenType.PERCENT:
+        emitOp(OpCode.MOD);
+        break;
       default:
         return; // Unreachable.
     }
   }
 
   void call(bool canAssign) {
+    final token = parser.secondPrevious;
     var argCount = argumentList();
     emitBytes(OpCode.CALL.index, argCount);
+    tracer.functionCall(token, argCount);
   }
 
   void listIndex(bool canAssign) {
-    expression();
-    consume(TokenType.RIGHT_BRACK, "Expect ']' after list indexing.");
-    if (canAssign && match(TokenType.EQUAL)) {
+    var getRange = match(TokenType.COLUMN);
+    // Left hand side operand
+    if (getRange) {
+      emitConstant(Nil);
+    } else {
+      expression();
+      getRange = match(TokenType.COLUMN);
+    }
+    // Right hand side operand
+    if (match(TokenType.RIGHT_BRACK)) {
+      if (getRange) emitConstant(Nil);
+    } else {
+      if (getRange) expression();
+      consume(TokenType.RIGHT_BRACK, "Expect ']' after list indexing");
+    }
+    // Emit operation
+    if (getRange) {
+      emitOp(OpCode.CONTAINER_GET_RANGE);
+    } else if (canAssign && match(TokenType.EQUAL)) {
       expression();
       emitOp(OpCode.CONTAINER_SET);
     } else {
@@ -362,7 +450,7 @@ class Compiler {
   }
 
   void dot(bool canAssign) {
-    consume(TokenType.IDENTIFIER, "Expect property name after '.'.");
+    consume(TokenType.IDENTIFIER, "Expect property name after '.'");
     var name = identifierConstant(parser.previous);
     if (canAssign && match(TokenType.EQUAL)) {
       expression();
@@ -378,11 +466,11 @@ class Compiler {
 
   void literal(bool canAssign) {
     switch (parser.previous.type) {
-      case TokenType.FALSE:
-        emitOp(OpCode.FALSE);
-        break;
       case TokenType.NIL:
         emitOp(OpCode.NIL);
+        break;
+      case TokenType.FALSE:
+        emitOp(OpCode.FALSE);
         break;
       case TokenType.TRUE:
         emitOp(OpCode.TRUE);
@@ -394,24 +482,35 @@ class Compiler {
 
   void grouping(bool canAssign) {
     expression();
-    consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
+    consume(TokenType.RIGHT_PAREN, "Expect ')' after expression");
   }
 
   void listInit(bool canAssign) {
     var valCount = 0;
-    if (!check(TokenType.RIGHT_BRACK)) {
-      do {
+    if (!parser.check(TokenType.RIGHT_BRACK)) {
+      expression();
+      valCount += 1;
+      if (parser.match(TokenType.COLUMN)) {
         expression();
-        valCount++;
-      } while (match(TokenType.COMMA));
+        valCount = -1;
+      } else {
+        while (match(TokenType.COMMA)) {
+          expression();
+          valCount++;
+        }
+      }
     }
-    consume(TokenType.RIGHT_BRACK, "Expect ']' after list initializer.");
-    emitBytes(OpCode.LIST_INIT.index, valCount);
+    consume(TokenType.RIGHT_BRACK, "Expect ']' after list initializer");
+    if (valCount >= 0) {
+      emitBytes(OpCode.LIST_INIT.index, valCount);
+    } else {
+      emitByte(OpCode.LIST_INIT_RANGE.index);
+    }
   }
 
   void mapInit(bool canAssign) {
     var valCount = 0;
-    if (!check(TokenType.RIGHT_BRACE)) {
+    if (!parser.check(TokenType.RIGHT_BRACE)) {
       do {
         expression();
         consume(TokenType.COLUMN, "Expect ':' between map key-value pairs");
@@ -419,16 +518,25 @@ class Compiler {
         valCount++;
       } while (match(TokenType.COMMA));
     }
-    consume(TokenType.RIGHT_BRACE, "Expect '}' after map initializer.");
+    consume(TokenType.RIGHT_BRACE, "Expect '}' after map initializer");
     emitBytes(OpCode.MAP_INIT.index, valCount);
   }
 
   void number(bool canAssign) {
-    var value = double.parse(parser.previous.str);
+    final value = double.tryParse(parser.previous.str);
+    if (value == null) {
+      parser.error('Invalid number');
+    } else {
+      emitConstant(value);
+    }
+  }
+
+  void object(bool canAssign) {
+    final value = parser.previous.val;
     emitConstant(value);
   }
 
-  void or_(bool canAssign) {
+  void _or(bool canAssign) {
     var elseJump = emitJump(OpCode.JUMP_IF_FALSE);
     var endJump = emitJump(OpCode.JUMP);
     patchJump(elseJump);
@@ -439,66 +547,102 @@ class Compiler {
 
   void string(bool canAssign) {
     final str = parser.previous.str;
-    emitConstant(str.substring(1, str.length - 1));
+    emitConstant(str);
   }
 
-  void namedVariable(Token name, bool canAssign) {
+  void getOrSetVariable(Token name, bool canAssign) {
     OpCode getOp, setOp;
     var arg = resolveLocal(name);
+    Token rootToken;
+    var isLocal = true;
     if (arg != -1) {
       getOp = OpCode.GET_LOCAL;
       setOp = OpCode.SET_LOCAL;
+      rootToken = locals[arg].name;
     } else if ((arg = resolveUpvalue(name)) != -1) {
       getOp = OpCode.GET_UPVALUE;
       setOp = OpCode.SET_UPVALUE;
+      rootToken = upvalues[arg].name;
     } else {
       arg = identifierConstant(name);
       getOp = OpCode.GET_GLOBAL;
       setOp = OpCode.SET_GLOBAL;
+      rootToken = name;
+      isLocal = false;
     }
 
-    if (canAssign && match(TokenType.EQUAL)) {
+    // Special mathematical assignment
+    OpCode assignOp;
+    if (canAssign) {
+      if (matchPair(TokenType.PLUS, TokenType.EQUAL)) {
+        assignOp = OpCode.ADD;
+      } else if (matchPair(TokenType.MINUS, TokenType.EQUAL)) {
+        assignOp = OpCode.SUBTRACT;
+      } else if (matchPair(TokenType.STAR, TokenType.EQUAL)) {
+        assignOp = OpCode.MULTIPLY;
+      } else if (matchPair(TokenType.SLASH, TokenType.EQUAL)) {
+        assignOp = OpCode.DIVIDE;
+      } else if (matchPair(TokenType.PERCENT, TokenType.EQUAL)) {
+        assignOp = OpCode.MOD;
+      } else if (matchPair(TokenType.CARET, TokenType.EQUAL)) {
+        assignOp = OpCode.POW;
+      }
+    }
+
+    TraceEventType eventType;
+    if (canAssign && (assignOp != null || match(TokenType.EQUAL))) {
+      if (assignOp != null) emitBytes(getOp.index, arg);
       expression();
+      if (assignOp != null) emitOp(assignOp);
       emitBytes(setOp.index, arg);
+      eventType = TraceEventType.VARIABLE_SET;
     } else {
       emitBytes(getOp.index, arg);
+      eventType = TraceEventType.VARIABLE_GET;
+    }
+    // Trace tokens
+    currentChunk.setTraceEvent(TraceEvent(name, type: eventType));
+    if (isLocal) {
+      tracer.linkLocal(rootToken, name);
+    } else {
+      tracer.linkGlobal(rootToken.str, name);
     }
   }
 
   void variable(bool canAssign) {
-    namedVariable(parser.previous, canAssign);
+    getOrSetVariable(parser.previous, canAssign);
   }
 
-  Token syntheticToken(String text) {
-    return Token(TokenType.IDENTIFIER, text, 0, 0);
+  Token syntheticToken(String str) {
+    return Token(TokenType.IDENTIFIER, str: str);
   }
 
-  void super_(bool canAssign) {
+  void _super(bool canAssign) {
     if (currentClass == null) {
-      error("Can't use 'super' outside of a class.");
+      parser.error("Can't use 'super' outside of a class");
     } else if (!currentClass.hasSuperclass) {
-      error("Can't use 'super' in a class with no superclass.");
+      parser.error("Can't use 'super' in a class with no superclass");
     }
 
-    consume(TokenType.DOT, "Expect '.' after 'super'.");
-    consume(TokenType.IDENTIFIER, 'Expect superclass method name.');
+    consume(TokenType.DOT, "Expect '.' after 'super'");
+    consume(TokenType.IDENTIFIER, 'Expect superclass method name');
     var name = identifierConstant(parser.previous);
 
-    namedVariable(syntheticToken('this'), false);
+    getOrSetVariable(syntheticToken('this'), false);
     if (match(TokenType.LEFT_PAREN)) {
       var argCount = argumentList();
-      namedVariable(syntheticToken('super'), false);
+      getOrSetVariable(syntheticToken('super'), false);
       emitBytes(OpCode.SUPER_INVOKE.index, name);
       emitByte(argCount);
     } else {
-      namedVariable(syntheticToken('super'), false);
+      getOrSetVariable(syntheticToken('super'), false);
       emitBytes(OpCode.GET_SUPER.index, name);
     }
   }
 
-  void this_(bool canAssign) {
+  void _this(bool canAssign) {
     if (currentClass == null) {
-      error("Can't use 'this' outside of a class.");
+      parser.error("Can't use 'this' outside of a class");
       return;
     }
     variable(false);
@@ -533,6 +677,8 @@ class Compiler {
         TokenType.SEMICOLON: ParseRule(null, null, Precedence.NONE),
         TokenType.SLASH: ParseRule(null, binary, Precedence.FACTOR),
         TokenType.STAR: ParseRule(null, binary, Precedence.FACTOR),
+        TokenType.CARET: ParseRule(null, binary, Precedence.POWER),
+        TokenType.PERCENT: ParseRule(null, binary, Precedence.FACTOR),
         TokenType.COLUMN: ParseRule(null, null, Precedence.NONE),
         TokenType.BANG: ParseRule(unary, null, Precedence.NONE),
         TokenType.BANG_EQUAL: ParseRule(null, binary, Precedence.EQUALITY),
@@ -545,7 +691,8 @@ class Compiler {
         TokenType.IDENTIFIER: ParseRule(variable, null, Precedence.NONE),
         TokenType.STRING: ParseRule(string, null, Precedence.NONE),
         TokenType.NUMBER: ParseRule(number, null, Precedence.NONE),
-        TokenType.AND: ParseRule(null, and_, Precedence.AND),
+        TokenType.OBJECT: ParseRule(object, null, Precedence.NONE),
+        TokenType.AND: ParseRule(null, _and, Precedence.AND),
         TokenType.CLASS: ParseRule(null, null, Precedence.NONE),
         TokenType.ELSE: ParseRule(null, null, Precedence.NONE),
         TokenType.FALSE: ParseRule(literal, null, Precedence.NONE),
@@ -553,36 +700,38 @@ class Compiler {
         TokenType.FUN: ParseRule(null, null, Precedence.NONE),
         TokenType.IF: ParseRule(null, null, Precedence.NONE),
         TokenType.NIL: ParseRule(literal, null, Precedence.NONE),
-        TokenType.OR: ParseRule(null, or_, Precedence.OR),
+        TokenType.OR: ParseRule(null, _or, Precedence.OR),
         TokenType.PRINT: ParseRule(null, null, Precedence.NONE),
         TokenType.RETURN: ParseRule(null, null, Precedence.NONE),
-        TokenType.SUPER: ParseRule(super_, null, Precedence.NONE),
-        TokenType.THIS: ParseRule(this_, null, Precedence.NONE),
+        TokenType.SUPER: ParseRule(_super, null, Precedence.NONE),
+        TokenType.THIS: ParseRule(_this, null, Precedence.NONE),
         TokenType.TRUE: ParseRule(literal, null, Precedence.NONE),
         TokenType.VAR: ParseRule(null, null, Precedence.NONE),
         TokenType.WHILE: ParseRule(null, null, Precedence.NONE),
+        TokenType.BREAK: ParseRule(null, null, Precedence.NONE),
+        TokenType.CONTINUE: ParseRule(null, null, Precedence.NONE),
         TokenType.ERROR: ParseRule(null, null, Precedence.NONE),
         TokenType.EOF: ParseRule(null, null, Precedence.NONE),
       };
 
   void parsePrecedence(Precedence precedence) {
-    advance();
+    parser.advance();
     final prefixRule = getRule(parser.previous.type).prefix;
     if (prefixRule == null) {
-      error('Expect expression.');
+      parser.error('Expect expression');
       return;
     }
     final canAssign = precedence.index <= Precedence.ASSIGNMENT.index;
     prefixRule(canAssign);
 
     while (precedence.index <= getRule(parser.current.type).precedence.index) {
-      advance();
+      parser.advance();
       final infixRule = getRule(parser.previous.type).infix;
       infixRule(canAssign);
     }
 
     if (canAssign && match(TokenType.EQUAL)) {
-      error('Invalid assignment target.');
+      parser.error('Invalid assignment target');
     }
   }
 
@@ -595,65 +744,75 @@ class Compiler {
   }
 
   void block() {
-    while (!check(TokenType.RIGHT_BRACE) && !check(TokenType.EOF)) {
+    while (
+        !parser.check(TokenType.RIGHT_BRACE) && !parser.check(TokenType.EOF)) {
       declaration();
     }
-    consume(TokenType.RIGHT_BRACE, "Expect '}' after block.");
+    consume(TokenType.RIGHT_BRACE, 'Unterminated block');
   }
 
-  // TODO: handle more gracefully (upon creation)
   ObjFunction functionInner() {
-    beginScope(); // [no-end-scope]
+    // beginScope(); // [no-end-scope]
+    // not needeed because of wrapped compiler scope propagation
 
     // Compile the parameter list.
-    consume(TokenType.LEFT_PAREN, "Expect '(' after function name.");
-    if (!check(TokenType.RIGHT_PAREN)) {
+    // final functionToken = parser.previous;
+    consume(TokenType.LEFT_PAREN, "Expect '(' after function name");
+    var args = <Token>[];
+    if (!parser.check(TokenType.RIGHT_PAREN)) {
       do {
         function.arity++;
         if (function.arity > 255) {
-          errorAtCurrent("Can't have more than 255 parameters.");
+          parser.errorAtCurrent("Can't have more than 255 parameters");
         }
-
-        var paramConstant = parseVariable('Expect parameter name.');
-        defineVariable(paramConstant);
+        parseVariable('Expect parameter name');
+        markLocalVariableInitialized();
+        args.add(parser.previous);
       } while (match(TokenType.COMMA));
     }
-    consume(TokenType.RIGHT_PAREN, "Expect ')' after parameters.");
+    for (var k = 0; k < args.length; k++) {
+      defineVariable(0, token: args[k], peekDist: args.length - 1 - k);
+    }
+    consume(TokenType.RIGHT_PAREN, "Expect ')' after parameters");
 
     // The body.
-    consume(TokenType.LEFT_BRACE, "Expect '{' before function body.");
+    consume(TokenType.LEFT_BRACE, 'Expect function body');
     block();
 
     // Create the function object.
     return endCompiler();
   }
 
-  void functionBlock(FunctionType type) {
-    final compiler = Compiler(type, this);
+  ObjFunction functionBlock(FunctionType type) {
+    final compiler = Compiler._(type, enclosing: this);
     final function = compiler.functionInner();
     emitBytes(OpCode.CLOSURE.index, makeConstant(function));
     for (var i = 0; i < compiler.upvalues.length; i++) {
       emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
       emitByte(compiler.upvalues[i].index);
     }
+    return function;
   }
 
   void method() {
-    consume(TokenType.IDENTIFIER, 'Expect method name.');
-    var constant = identifierConstant(parser.previous);
+    consume(TokenType.FUN, 'Expect function identifier');
+    consume(TokenType.IDENTIFIER, 'Expect method name');
+    final identifier = parser.previous;
+    var constant = identifierConstant(identifier);
     var type = FunctionType.METHOD;
-    if (parser.previous.str == 'init') {
+    if (identifier.str == 'init') {
       type = FunctionType.INITIALIZER;
     }
-    functionBlock(type);
+    final fun = functionBlock(type);
     emitBytes(OpCode.METHOD.index, constant);
+    tracer.defineFunction(identifier, fun.arity);
   }
 
   void classDeclaration() {
-    consume(TokenType.IDENTIFIER, 'Expect class name.');
+    consume(TokenType.IDENTIFIER, 'Expect class name');
     final className = parser.previous;
     final nameConstant = identifierConstant(parser.previous);
-    declareVariable();
+    delareLocalVariable();
 
     emitBytes(OpCode.CLASS.index, nameConstant);
     defineVariable(nameConstant);
@@ -662,28 +821,29 @@ class Compiler {
     currentClass = classCompiler;
 
     if (match(TokenType.LESS)) {
-      consume(TokenType.IDENTIFIER, 'Expect superclass name.');
+      consume(TokenType.IDENTIFIER, 'Expect superclass name');
       variable(false);
 
       if (identifiersEqual(className, parser.previous)) {
-        error("A class can't inherit from itself.");
+        parser.error("A class can't inherit from itself");
       }
 
       beginScope();
       addLocal(syntheticToken('super'));
       defineVariable(0);
 
-      namedVariable(className, false);
+      getOrSetVariable(className, false);
       emitOp(OpCode.INHERIT);
       classCompiler.hasSuperclass = true;
     }
 
-    namedVariable(className, false);
-    consume(TokenType.LEFT_BRACE, "Expect '{' before class body.");
-    while (!check(TokenType.RIGHT_BRACE) && !check(TokenType.EOF)) {
+    getOrSetVariable(className, false);
+    consume(TokenType.LEFT_BRACE, 'Expect class body');
+    while (
+        !parser.check(TokenType.RIGHT_BRACE) && !parser.check(TokenType.EOF)) {
       method();
     }
-    consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.");
+    consume(TokenType.RIGHT_BRACE, 'Unterminated class body');
     emitOp(OpCode.POP);
 
     if (classCompiler.hasSuperclass) {
@@ -694,34 +854,46 @@ class Compiler {
   }
 
   void funDeclaration() {
-    var global = parseVariable('Expect function name.');
-    markInitialized();
-    functionBlock(FunctionType.FUNCTION);
-    defineVariable(global);
+    var global = parseVariable('Expect function name');
+    final token = parser.previous;
+    markLocalVariableInitialized();
+    final fun = functionBlock(FunctionType.FUNCTION);
+    defineVariable(global, token: token);
+    tracer.defineFunction(token, fun.arity);
   }
 
   void varDeclaration() {
-    var global = parseVariable('Expect variable name.');
-
-    if (match(TokenType.EQUAL)) {
-      expression();
-    } else {
-      emitOp(OpCode.NIL);
-    }
-    consume(TokenType.SEMICOLON, "Expect ';' after variable declaration.");
-
-    defineVariable(global);
+    do {
+      final global = parseVariable('Expect variable name');
+      final token = parser.previous;
+      if (match(TokenType.EQUAL)) {
+        expression();
+      } else {
+        emitOp(OpCode.NIL);
+      }
+      defineVariable(global, token: token);
+    } while (match(TokenType.COMMA));
+    consume(TokenType.SEMICOLON, 'Expect a newline after variable declaration');
   }
 
   void expressionStatement() {
     expression();
-    consume(TokenType.SEMICOLON, "Expect ';' after expression.");
+    consume(TokenType.SEMICOLON, 'Expect a newline after expression');
     emitOp(OpCode.POP);
   }
 
-  void forStatement() {
+  void forStatementCheck() {
+    if (match(TokenType.LEFT_PAREN)) {
+      legacyForStatement();
+    } else {
+      forStatement();
+    }
+  }
+
+  void legacyForStatement() {
+    // Deprecated
     beginScope();
-    consume(TokenType.LEFT_PAREN, "Expect '(' after 'for'.");
+    // consume(TokenType.LEFT_PAREN, "Expect '(' after 'for'");
     if (match(TokenType.SEMICOLON)) {
       // No initializer.
     } else if (match(TokenType.VAR)) {
@@ -734,7 +906,7 @@ class Compiler {
     var exitJump = -1;
     if (!match(TokenType.SEMICOLON)) {
       expression();
-      consume(TokenType.SEMICOLON, "Expect ';' after loop condition.");
+      consume(TokenType.SEMICOLON, "Expect ';' after loop condition");
       exitJump = emitJump(OpCode.JUMP_IF_FALSE);
       emitOp(OpCode.POP); // Condition.
     }
@@ -744,7 +916,7 @@ class Compiler {
       final incrementStart = currentChunk.count;
       expression();
       emitOp(OpCode.POP);
-      consume(TokenType.RIGHT_PAREN, "Expect ')' after for clauses.");
+      consume(TokenType.RIGHT_PAREN, "Expect ')' after for clauses");
       emitLoop(loopStart);
       loopStart = incrementStart;
       patchJump(bodyJump);
@@ -759,10 +931,50 @@ class Compiler {
     endScope();
   }
 
+  void forStatement() {
+    beginScope();
+    // Key
+    parseVariable('Expect variable name'); // Streamline those operations
+    emitOp(OpCode.NIL);
+    defineVariable(0, token: parser.previous); // remove 0
+    var keyOpIdx = currentChunk.count - 1;
+    var valOpIdx = keyOpIdx;
+    if (match(TokenType.COMMA)) {
+      // Value
+      parseVariable('Expect variable name');
+      emitOp(OpCode.NIL);
+      defineVariable(0, token: parser.previous);
+      valOpIdx = currentChunk.count - 1;
+    }
+    // Now add two dummy local variables. Idx & entries
+    addLocal(syntheticToken('_for_idx_'));
+    emitOp(OpCode.NIL);
+    markLocalVariableInitialized();
+    addLocal(syntheticToken('_for_iterable_'));
+    emitOp(OpCode.NIL);
+    markLocalVariableInitialized();
+    // Rest of the loop
+    consume(TokenType.IN, "Expect 'in' after loop variables");
+    expression(); // Iterable
+    // Iterator
+    final loopStart = currentChunk.count;
+    emitOp(OpCode.CONTAINER_ITERATE);
+    emitBytes(keyOpIdx, valOpIdx);
+    final exitJump = emitJump(OpCode.JUMP_IF_FALSE);
+    emitOp(OpCode.POP); // Condition
+    // Body
+    statement();
+    emitLoop(loopStart);
+    // Exit
+    patchJump(exitJump);
+    emitOp(OpCode.POP); // Condition
+    endScope();
+  }
+
   void ifStatement() {
-    consume(TokenType.LEFT_PAREN, "Expect '(' after 'if'.");
+    // consume(TokenType.LEFT_PAREN, "Expect '(' after 'if'");
     expression();
-    consume(TokenType.RIGHT_PAREN, "Expect ')' after condition."); // [paren]
+    // consume(TokenType.RIGHT_PAREN, "Expect ')' after condition"); // [paren]
     final thenJump = emitJump(OpCode.JUMP_IF_FALSE);
     emitOp(OpCode.POP);
     statement();
@@ -775,22 +987,22 @@ class Compiler {
 
   void printStatement() {
     expression();
-    consume(TokenType.SEMICOLON, "Expect ';' after value.");
+    consume(TokenType.SEMICOLON, 'Expect a newline after value');
     emitOp(OpCode.PRINT);
   }
 
   void returnStatement() {
-    if (type == FunctionType.SCRIPT) {
-      error("Can't return from top-level code.");
-    }
+    // if (type == FunctionType.SCRIPT) {
+    //   parser.error("Can't return from top-level code");
+    // }
     if (match(TokenType.SEMICOLON)) {
       emitReturn();
     } else {
       if (type == FunctionType.INITIALIZER) {
-        error("Can't return a value from an initializer.");
+        parser.error("Can't return a value from an initializer");
       }
       expression();
-      consume(TokenType.SEMICOLON, "Expect ';' after return value.");
+      consume(TokenType.SEMICOLON, 'Expect a newline after return value');
       emitOp(OpCode.RETURN);
     }
   }
@@ -798,9 +1010,9 @@ class Compiler {
   void whileStatement() {
     final loopStart = currentChunk.count;
 
-    consume(TokenType.LEFT_PAREN, "Expect '(' after 'while'.");
+    // consume(TokenType.LEFT_PAREN, "Expect '(' after 'while'");
     expression();
-    consume(TokenType.RIGHT_PAREN, "Expect ')' after condition.");
+    // consume(TokenType.RIGHT_PAREN, "Expect ')' after condition");
 
     final exitJump = emitJump(OpCode.JUMP_IF_FALSE);
 
@@ -831,11 +1043,10 @@ class Compiler {
           return;
 
         default:
-          // Do nothing.
-          ;
+        // Do nothing.
       }
 
-      advance();
+      parser.advance();
     }
   }
 
@@ -856,7 +1067,7 @@ class Compiler {
     if (match(TokenType.PRINT)) {
       printStatement();
     } else if (match(TokenType.FOR)) {
-      forStatement();
+      forStatementCheck();
     } else if (match(TokenType.IF)) {
       ifStatement();
     } else if (match(TokenType.RETURN)) {
@@ -870,92 +1081,5 @@ class Compiler {
     } else {
       expressionStatement();
     }
-  }
-
-  // STATIC FIELD METHODS
-  static ObjFunction compile(String source, { bool silent = false }) {
-    scanner = Scanner(source);
-    // Print scanner result
-
-    if (DEBUG_TRACE_SCANNER) {
-      var line = -1;
-      for (;;) {
-        final token = scanner.scanToken();
-        if (token.line != line) {
-          stdout.write(sprintf('%4d ', [token.line]));
-          line = token.line;
-        } else {
-          stdout.write('   | ');
-        }
-        stdout.write(sprintf("%2d '%s'\n", [token.type.index, token.str]));
-        if (token.type == TokenType.EOF) break;
-      }
-      return null;
-    }
-
-    parser = Parser();
-    final compiler = Compiler(FunctionType.SCRIPT);
-    parser.hadError = false;
-    parser.panicMode = false;
-    // TODO: extract in compiler
-    advance();
-    while (!match(TokenType.EOF)) {
-      compiler.declaration();
-    }
-    final function = compiler.endCompiler();
-    return parser.hadError ? null : function;
-  }
-
-  static void errorAt(Token token, String message) {
-    if (parser.panicMode) return;
-    parser.panicMode = true;
-
-    stderr.write('[line ${token.line}] Error');
-
-    if (token.type == TokenType.EOF) {
-      stderr.write(' at end');
-    } else if (token.type == TokenType.ERROR) {
-      // Nothing.
-    } else {
-      stderr.write(' at \'${token.str}\'');
-    }
-
-    stderr.write(': $message\n');
-    parser.hadError = true;
-  }
-
-  static void error(String message) {
-    errorAt(parser.previous, message);
-  }
-
-  static void errorAtCurrent(String message) {
-    errorAt(parser.current, message);
-  }
-
-  static void advance() {
-    parser.previous = parser.current;
-    for (;;) {
-      parser.current = scanner.scanToken();
-      if (parser.current.type != TokenType.ERROR) break;
-      errorAtCurrent(parser.current.str);
-    }
-  }
-
-  static void consume(TokenType type, String message) {
-    if (parser.current.type == type) {
-      advance();
-      return;
-    }
-    errorAtCurrent(message);
-  }
-
-  static bool check(TokenType type) {
-    return parser.current.type == type;
-  }
-
-  static bool match(TokenType type) {
-    if (!check(type)) return false;
-    advance();
-    return true;
   }
 }

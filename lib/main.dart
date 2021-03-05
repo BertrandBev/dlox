@@ -1,16 +1,19 @@
 import 'dart:convert';
 import 'dart:io';
-
+import 'package:dlox/scanner.dart';
 import 'package:dlox/vm.dart';
-
-VM vm = VM();
+import 'compiler.dart';
+import 'debug.dart';
 
 void repl() {
+  final vm = SyncVM();
   while (true) {
-    stdout.write('> ');
+    stdwrite('> ');
     final line = stdin.readLineSync(encoding: Encoding.getByName('utf-8'));
     if (line == null) break;
-    vm.interpret(line + '\n');
+    final tokens = Scanner.scan(line + '\n', );
+    vm.compile(tokens);
+    vm.run();
   }
 }
 
@@ -19,22 +22,27 @@ String readFile(String path) {
 }
 
 void runFile(String path) {
+  CompilerResult result;
+  final vm = SyncVM();
   final source = readFile(path);
-  final result = vm.interpret(source);
-  if (result == InterpretResult.COMPILE_ERROR) exit(65);
-  if (result == InterpretResult.RUNTIME_ERROR) exit(70);
+  final tokens = Scanner.scan(source, );
+  result = vm.compile(tokens);
+  if (result.errors.isNotEmpty) exit(65);
+  vm.setFunctionParams(result, FunctionParams());
+  final res = vm.run();
+  if (res.errors.isNotEmpty) exit(70);
 }
 
-void main(List<String> args) {
-  // initVM();
-  args = ['examples/map.lox'];
-
+void main(List<String> args) async {
+  final path =
+      '/Users/bbevillard/Documents/Bev/Code/Flutter/paradigm/lib/lang/examples/';
+  args = [path + 'easy.txt'];
   if (args.isEmpty) {
     repl();
   } else if (args.length == 1) {
     runFile(args[0]);
   } else {
-    stderr.writeln('Usage: clox [path]');
+    stdwriteln('Usage: clox [path]');
     exit(64);
   }
 }

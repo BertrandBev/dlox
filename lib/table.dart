@@ -1,4 +1,5 @@
 class Table {
+  // Optimisation: replace with MAP
   final data = <String, Object>{};
 
   Object getVal(String key) {
@@ -20,7 +21,7 @@ class Table {
   }
 
   Object findString(String str) {
-    // TODO: key on hashKeys
+    // Optimisation: key on hashKeys
     return data[str];
   }
 }

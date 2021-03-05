@@ -1,19 +1,23 @@
-import 'dart:ffi';
-import 'dart:io';
+import 'dart:math';
 
 import 'package:dlox/chunk.dart';
 import 'package:dlox/common.dart';
 import 'package:dlox/compiler.dart';
 import 'package:dlox/debug.dart';
+import 'package:dlox/error.dart';
 import 'package:dlox/native.dart';
 import 'package:dlox/object.dart';
+import 'package:dlox/scanner.dart';
 import 'package:dlox/table.dart';
 import 'package:dlox/value.dart';
 import 'package:sprintf/sprintf.dart';
 
+import 'native_classes.dart';
+
 const int UINT8_COUNT = 256;
 const int FRAMES_MAX = 64;
 const int STACK_MAX = (FRAMES_MAX * UINT8_COUNT);
+const BATCH_COUNT = 1000000; // Must be fast enough
 
 class CallFrame {
   ObjClosure closure;
@@ -22,39 +26,194 @@ class CallFrame {
   int slotsIdx; // Index in stack of the frame slot
 }
 
-enum InterpretResult { OK, COMPILE_ERROR, RUNTIME_ERROR }
+class InterpreterResult {
+  final List<LangError> errors;
+  final int lastLine;
+  final int stepCount;
+  final Object returnValue;
+  final Map<Token, Object> tokenValues;
+
+  bool get done {
+    return errors.isNotEmpty || returnValue != null;
+  }
+
+  InterpreterResult(
+    List<LangError> errors,
+    this.tokenValues,
+    this.lastLine,
+    this.stepCount,
+    this.returnValue,
+  ) : this.errors = List<LangError>.from(errors);
+}
+
+// Public interface of the VM
+class SyncVM {
+  VM vm;
+
+  SyncVM({bool silent = false}) {
+    vm = VM();
+    vm.silent = silent;
+  }
+
+  // Public interface
+  bool get done {
+    return vm.done;
+  }
+
+  void setFunctionParams(CompilerResult compilerResult, FunctionParams params) {
+    vm.setFunction(compilerResult, params);
+  }
+
+  CompilerResult compile(List<Token> tokens) {
+    return Compiler.compile(tokens);
+  }
+
+  InterpreterResult _loop() {
+    InterpreterResult res;
+    do {
+      res = vm.stepBatch();
+    } while (res == null);
+    return res;
+  }
+
+  InterpreterResult run() {
+    if (vm.done) return null;
+    vm.stepCode = false;
+    vm.traceValues = true;
+    return _loop();
+  }
+}
+
+class FunctionParams {
+  final String function;
+  final List<Object> args;
+  final Map<String, Object> globals;
+
+  FunctionParams({this.function, this.args, this.globals});
+}
 
 class VM {
-  List<CallFrame> frames = List<CallFrame>(FRAMES_MAX);
-  int frameCount;
-  List<Object> stack = List<Object>(STACK_MAX);
+  static const INIT_STRING = 'init';
+  final List<CallFrame> frames = List<CallFrame>(FRAMES_MAX);
+  final List<Object> stack = List<Object>(STACK_MAX);
+  // VM state
+  final List<RuntimeError> errors = [];
+  final Table globals = Table();
+  final Table strings = Table();
+  CompilerResult compilerResult;
+  int frameCount = 0;
   int stackTop = 0;
-  Table globals = Table();
-  Table strings = Table();
-  String initString;
   ObjUpvalue openUpvalues;
-  Object objects;
-  bool silent = true;
+  // Debug variables
+  int stepCount = 0;
+  int line = -1;
+  // int skipLine = -1;
+  bool hasOp = false;
+  final Map<Token, Object> tokenValues = {};
+  // Debug API
+  bool traceValues = false;
+  bool stepCode = false;
+  bool silent = false;
   final stdout = StringBuffer();
 
   VM() {
-    resetStack();
-    objects = null;
-    initString = 'init';
-    defineNative('clock', clockNative);
+    _reset();
     for (var k = 0; k < frames.length; k++) {
       frames[k] = CallFrame();
     }
   }
 
-  void resetStack() {
+  RuntimeError addError(String msg, {RuntimeError link}) {
+    Token token;
+    if (frameCount > 0) {
+      final frame = frames[frameCount - 1];
+      final trace = frame.chunk.trace;
+      if (trace.length > frame.ip) token = trace[frame.ip].token;
+    }
+    final err = RuntimeError(token, msg, link: link);
+    errors.add(err);
+    // Dump error if needed
+    if (!silent) err.dump();
+    return err;
+  }
+
+  InterpreterResult getResult(int line, {Object returnValue}) {
+    final tokenValues =
+        traceValues ? this.tokenValues : <Token, Object>{}; // valueSnapshot();
+    return InterpreterResult(
+      errors,
+      tokenValues,
+      line,
+      stepCount,
+      returnValue,
+    );
+  }
+
+  InterpreterResult get result {
+    return getResult(line);
+  }
+
+  InterpreterResult withError(String msg) {
+    addError(msg);
+    return result;
+  }
+
+  void _reset() {
+    // Reset data
+    errors.clear();
+    globals.data.clear();
+    strings.data.clear();
     stackTop = 0;
     frameCount = 0;
     openUpvalues = null;
+    // Reset debug values
+    stepCount = 0;
+    line = -1;
+    hasOp = false;
+    tokenValues.clear();
+    stdout.clear();
+    // Reset flags
+    traceValues = false;
+    stepCode = false;
+    // Define natives
+    defineNatives();
   }
 
-  void defineNative(String name, NativeFunction function) {
-    globals.setVal(name, ObjNative(name, function));
+  void setFunction(CompilerResult compilerResult, FunctionParams params) {
+    _reset();
+    // Set compiler result
+    if (compilerResult == null) throw Exception('Null compiler result');
+    if (compilerResult.errors.isNotEmpty) {
+      throw Exception('Compiler result had errors');
+    }
+    this.compilerResult = compilerResult;
+    // Set function
+    var fun = compilerResult.function;
+    if (params.function != null) {
+      fun = compilerResult.function.chunk.constants.firstWhere((obj) {
+        return obj is ObjFunction && obj.name == params.function;
+      });
+      if (fun == null) throw Exception('Function not found ${params.function}');
+    }
+    // Set globals
+    if (params.globals != null) globals.data.addAll(params.globals);
+    // Init VM
+    final closure = ObjClosure(fun);
+    push(closure);
+    if (params.args != null) params.args.forEach((arg) => push(arg));
+    callValue(closure, params.args?.length ?? 0);
+  }
+
+  void defineNatives() {
+    NATIVE_FUNCTIONS.forEach((function) {
+      globals.setVal(function.name, function);
+    });
+    NATIVE_VALUES.forEach((key, value) {
+      globals.setVal(key, value);
+    });
+    NATIVE_CLASSES.forEach((key, value) {
+      globals.setVal(key, value);
+    });
   }
 
   void push(Object value) {
@@ -71,13 +230,13 @@ class VM {
 
   bool call(ObjClosure closure, int argCount) {
     if (argCount != closure.function.arity) {
-      runtimeError('Expected %d arguments but got %d.',
+      runtimeError('Expected %d arguments but got %d',
           [closure.function.arity, argCount]);
       return false;
     }
 
     if (frameCount == FRAMES_MAX) {
-      runtimeError('Stack overflow.');
+      runtimeError('Stack overflow');
       return false;
     }
 
@@ -95,24 +254,34 @@ class VM {
       stack[stackTop - argCount - 1] = callee.receiver;
       return call(callee.method, argCount);
     } else if (callee is ObjClass) {
-      stack[stackTop - argCount - 1] = ObjInstance(callee);
-      final initializer = callee.methods.getVal(initString);
+      stack[stackTop - argCount - 1] = ObjInstance(klass: callee);
+      final initializer = callee.methods.getVal(INIT_STRING);
       if (initializer != null) {
         return call(initializer as ObjClosure, argCount);
       } else if (argCount != 0) {
-        runtimeError('Expected 0 arguments but got %d.', [argCount]);
+        runtimeError('Expected 0 arguments but got %d', [argCount]);
         return false;
       }
       return true;
     } else if (callee is ObjClosure) {
       return call(callee, argCount);
     } else if (callee is ObjNative) {
-      final result = callee.fn(stack, stackTop - argCount, argCount);
+      final res = callee.fn(stack, stackTop - argCount, argCount);
       stackTop -= argCount + 1;
-      push(result);
+      push(res);
+      return true;
+    } else if (callee is NativeClassCreator) {
+      try {
+        final res = callee(stack, stackTop - argCount, argCount);
+        stackTop -= argCount + 1;
+        push(res);
+      } on NativeError catch (e) {
+        runtimeError(e.format, e.args);
+        return false;
+      }
       return true;
     } else {
-      runtimeError('Can only call functions and classes.');
+      runtimeError('Can only call functions and classes');
       return false;
     }
   }
@@ -128,7 +297,7 @@ class VM {
 
   bool invokeMap(Map map, String name, int argCount) {
     if (!MAP_NATIVE_FUNCTIONS.containsKey(name)) {
-      runtimeError('Unknown method for map.');
+      runtimeError('Unknown method for map');
       return false;
     }
     final function = MAP_NATIVE_FUNCTIONS[name];
@@ -145,7 +314,7 @@ class VM {
 
   bool invokeList(List list, String name, int argCount) {
     if (!LIST_NATIVE_FUNCTIONS.containsKey(name)) {
-      runtimeError('Unknown method for list.');
+      runtimeError('Unknown method for list');
       return false;
     }
     final function = LIST_NATIVE_FUNCTIONS[name];
@@ -160,12 +329,45 @@ class VM {
     }
   }
 
+  bool invokeString(String str, String name, int argCount) {
+    if (!STRING_NATIVE_FUNCTIONS.containsKey(name)) {
+      runtimeError('Unknown method for string');
+      return false;
+    }
+    final function = STRING_NATIVE_FUNCTIONS[name];
+    try {
+      final rtn = function(str, stack, stackTop - argCount, argCount);
+      stackTop -= argCount + 1;
+      push(rtn);
+      return true;
+    } on NativeError catch (e) {
+      runtimeError(e.format, e.args);
+      return false;
+    }
+  }
+
+  bool invokeNativeClass(ObjNativeClass klass, String name, int argCount) {
+    try {
+      final rtn = klass.call(name, stack, stackTop - argCount, argCount);
+      stackTop -= argCount + 1;
+      push(rtn);
+      return true;
+    } on NativeError catch (e) {
+      runtimeError(e.format, e.args);
+      return false;
+    }
+  }
+
   bool invoke(String name, int argCount) {
     final receiver = peek(argCount);
     if (receiver is List) return invokeList(receiver, name, argCount);
     if (receiver is Map) return invokeMap(receiver, name, argCount);
+    if (receiver is String) return invokeString(receiver, name, argCount);
+    if (receiver is ObjNativeClass) {
+      return invokeNativeClass(receiver, name, argCount);
+    }
     if (!(receiver is ObjInstance)) {
-      runtimeError('Only instances have methods.');
+      runtimeError('Only instances have methods');
       return false;
     }
     final instance = receiver as ObjInstance;
@@ -173,6 +375,14 @@ class VM {
     if (value != null) {
       stack[stackTop - argCount - 1] = value;
       return callValue(value, argCount);
+    }
+    if (instance.klass == null) {
+      final klass = globals.getVal(instance.klassName);
+      if (!(klass is ObjClass)) {
+        runtimeError('Class ${instance.klassName} not found');
+        return false;
+      }
+      instance.klass = klass as ObjClass;
     }
     return invokeFromClass(instance.klass, name, argCount);
   }
@@ -240,6 +450,7 @@ class VM {
   }
 
   int readShort(CallFrame frame) {
+    // TODO: Optimisation - remove
     frame.ip += 2;
     return frame.chunk.code[frame.ip - 2] << 8 | frame.chunk.code[frame.ip - 1];
   }
@@ -254,37 +465,83 @@ class VM {
 
   bool assertNumber(a, b) {
     if (!(a is double) || !(b is double)) {
-      runtimeError('Operands must be numbers.');
+      runtimeError('Operands must be numbers');
       return false;
     }
     return true;
   }
 
-  int checkIndex(List arr, Object idxObj) {
+  int checkIndex(int length, Object idxObj, {bool fromStart = true}) {
+    if (idxObj == Nil) idxObj = fromStart ? 0.0 : length.toDouble();
     if (!(idxObj is double)) {
-      runtimeError('List index must be a number.');
+      runtimeError('Index must be a number');
       return null;
     }
-    final idx = (idxObj as double).toInt();
-    if (idx < 0 || idx >= arr.length) {
-      runtimeError('List index out of bounds.');
+    var idx = (idxObj as double).toInt();
+    if (idx < 0) idx = length + idx;
+    final max = fromStart ? length - 1 : length;
+    if (idx < 0 || idx > max) {
+      runtimeError('Index $idx out of bounds [0, $max]');
       return null;
     }
     return idx;
   }
 
-  InterpretResult run() {
+  void vmSetValue(CallFrame frame, Object value, {int ip}) {
+    ip ??= frame.ip - 1;
+    final function = frame.closure.function;
+    final traceEvent = function.chunk.trace[ip];
+    final eventType = traceEvent?.type;
+    if (eventType != TraceEventType.NONE) {
+      // Clone value deeply if needed
+      // Optimisation: clone on mutation! (more efficient)
+      tokenValues[traceEvent.token] = valueCloneDeep(value);
+    }
+  }
+
+  bool get done {
+    return frameCount == 0;
+  }
+
+  InterpreterResult stepBatch({int batchCount = BATCH_COUNT}) {
+    // Setup
+    if (frameCount == 0) return withError('No call frame');
     var frame = frames[frameCount - 1];
-    for (;;) {
-      if (DEBUG_TRACE_EXECUTION) {
-        stdout.write('          ');
-        for (var k = 0; k < stackTop; k++) {
-          stdout.write('[ ');
-          printValue(stack[k]);
-          stdout.write(' ]');
+    var stepCountLimit = stepCount + batchCount;
+    // Main loop
+    while (stepCount++ < stepCountLimit) {
+      // Setup current line
+      final frameLine = frame.chunk.lines[frame.ip];
+      // Step code helper
+      if (stepCode) {
+        final instruction = frame.chunk.code[frame.ip];
+        final op = OpCode.values[instruction];
+        // Pause execution on demand
+        if (frameLine != line && hasOp) {
+          // Newline detected, return
+          // No need to set line to frameLine thanks to hasOp
+          hasOp = false;
+          return getResult(line);
         }
-        stdout.write('\n');
-        disassembleInstruction(frame.closure.function.chunk, frame.ip);
+        // A line is worth stopping on if it has one of those opts
+        hasOp |= (op != OpCode.POP && op != OpCode.LOOP && op != OpCode.JUMP);
+      }
+
+      // Update line
+      final prevLine = line;
+      line = frameLine;
+
+      // Trace execution if needed
+      if (DEBUG_TRACE_EXECUTION) {
+        stdwrite('          ');
+        for (var k = 0; k < stackTop; k++) {
+          stdwrite('[ ');
+          printValue(stack[k]);
+          stdwrite(' ]');
+        }
+        stdwrite('\n');
+        disassembleInstruction(
+            prevLine, frame.closure.function.chunk, frame.ip);
       }
 
       final instruction = readByte(frame);
@@ -295,15 +552,19 @@ class VM {
             push(constant);
             break;
           }
+
         case OpCode.NIL:
           push(Nil);
           break;
+
         case OpCode.TRUE:
           push(true);
           break;
+
         case OpCode.FALSE:
           push(false);
           break;
+
         case OpCode.POP:
           pop();
           break;
@@ -312,6 +573,7 @@ class VM {
           {
             final slot = readByte(frame);
             push(stack[frame.slotsIdx + slot]);
+            if (traceValues) vmSetValue(frame, peek(0));
             break;
           }
 
@@ -319,6 +581,16 @@ class VM {
           {
             final slot = readByte(frame);
             stack[frame.slotsIdx + slot] = peek(0);
+            if (traceValues) vmSetValue(frame, peek(0));
+            break;
+          }
+
+        case OpCode.TRACER_DEFINE_LOCAL:
+          {
+            // Dummy instruction for tracing purposes
+            final slot = readByte(frame);
+            final value = stack[frame.slotsIdx + slot];
+            if (traceValues) vmSetValue(frame, value);
             break;
           }
 
@@ -327,10 +599,10 @@ class VM {
             final name = readString(frame);
             final value = globals.getVal(name);
             if (value == null) {
-              runtimeError("Undefined variable '%s'.", [name]);
-              return InterpretResult.RUNTIME_ERROR;
+              return runtimeError("Undefined variable '%s'.", [name]);
             }
             push(value);
+            if (traceValues) vmSetValue(frame, peek(0));
             break;
           }
 
@@ -338,6 +610,7 @@ class VM {
           {
             final name = readString(frame);
             globals.setVal(name, peek(0));
+            if (traceValues) vmSetValue(frame, peek(0));
             pop();
             break;
           }
@@ -347,9 +620,9 @@ class VM {
             final name = readString(frame);
             if (globals.setVal(name, peek(0))) {
               globals.delete(name); // [delete]
-              runtimeError("Undefined variable '%s'.", [name]);
-              return InterpretResult.RUNTIME_ERROR;
+              return runtimeError("Undefined variable '%s'.", [name]);
             }
+            if (traceValues) vmSetValue(frame, peek(0));
             break;
           }
 
@@ -360,6 +633,7 @@ class VM {
             push(upvalue.location != null
                 ? stack[upvalue.location]
                 : upvalue.closed);
+            if (traceValues) vmSetValue(frame, peek(0));
             break;
           }
 
@@ -372,39 +646,49 @@ class VM {
             } else {
               upvalue.closed = peek(0);
             }
+            if (traceValues) vmSetValue(frame, peek(0));
             break;
           }
 
         case OpCode.GET_PROPERTY:
           {
-            if (!(peek(0) is ObjInstance)) {
-              runtimeError('Only instances have properties.');
-              return InterpretResult.RUNTIME_ERROR;
+            Object value;
+            if (peek(0) is ObjInstance) {
+              ObjInstance instance = peek(0);
+              final name = readString(frame);
+              value = instance.fields.getVal(name);
+              if (value == null && !bindMethod(instance.klass, name)) {
+                return result;
+              }
+            } else if (peek(0) is ObjNativeClass) {
+              ObjNativeClass instance = peek(0);
+              final name = readString(frame);
+              try {
+                value = instance.getVal(name);
+              } on NativeError catch (e) {
+                return runtimeError(e.format, e.args);
+              }
+            } else {
+              return runtimeError('Only instances have properties');
             }
-
-            ObjInstance instance = peek(0);
-            final name = readString(frame);
-            final value = instance.fields.getVal(name);
             if (value != null) {
               pop(); // Instance.
               push(value);
-              break;
-            }
-
-            if (!bindMethod(instance.klass, name)) {
-              return InterpretResult.RUNTIME_ERROR;
             }
             break;
           }
 
         case OpCode.SET_PROPERTY:
           {
-            if (!(peek(1) is ObjInstance)) {
-              runtimeError('Only instances have fields.');
-              return InterpretResult.RUNTIME_ERROR;
+            if (peek(1) is ObjInstance) {
+              ObjInstance instance = peek(1);
+              instance.fields.setVal(readString(frame), peek(0));
+            } else if (peek(1) is ObjNativeClass) {
+              ObjNativeClass instance = peek(1);
+              instance.setVal(readString(frame), peek(0));
+            } else {
+              return runtimeError('Only instances have fields');
             }
-            ObjInstance instance = peek(1);
-            instance.fields.setVal(readString(frame), peek(0));
             final value = pop();
             pop();
             push(value);
@@ -416,7 +700,7 @@ class VM {
             final name = readString(frame);
             ObjClass superclass = pop();
             if (!bindMethod(superclass, name)) {
-              return InterpretResult.RUNTIME_ERROR;
+              return result;
             }
             break;
           }
@@ -429,21 +713,33 @@ class VM {
             break;
           }
 
+        // Optimisation create greater_or_equal
         case OpCode.GREATER:
           {
             final b = pop();
             final a = pop();
-            if (!assertNumber(a, b)) return InterpretResult.RUNTIME_ERROR;
-            push((a as double) > (b as double));
+            if (a is String && b is String) {
+              push(a.compareTo(b));
+            } else if (a is double && b is double) {
+              push(a > b);
+            } else {
+              return runtimeError('Operands must be numbers or strings');
+            }
             break;
           }
 
+        // Optimisation create less_or_equal
         case OpCode.LESS:
           {
             final b = pop();
             final a = pop();
-            if (!assertNumber(a, b)) return InterpretResult.RUNTIME_ERROR;
-            push((a as double) < (b as double));
+            if (a is String && b is String) {
+              push(b.compareTo(a));
+            } else if (a is double && b is double) {
+              push(a < b);
+            } else {
+              return runtimeError('Operands must be numbers or strings');
+            }
             break;
           }
 
@@ -458,9 +754,16 @@ class VM {
               push(a + b);
             } else if ((a is List) && (b is List)) {
               push(a + b);
+            } else if ((a is Map) && (b is Map)) {
+              Map res;
+              res.addAll(a);
+              res.addAll(b);
+              push(res);
+            } else if ((a is String) || (b is String)) {
+              push(valueToString(a) + valueToString(b));
             } else {
-              runtimeError('Operands must numbers, strings or lists.');
-              return InterpretResult.RUNTIME_ERROR;
+              return runtimeError(
+                  'Operands must numbers, strings, lists or maps');
             }
             break;
           }
@@ -469,7 +772,7 @@ class VM {
           {
             final b = pop();
             final a = pop();
-            if (!assertNumber(a, b)) return InterpretResult.RUNTIME_ERROR;
+            if (!assertNumber(a, b)) return result;
             push((a as double) - (b as double));
             break;
           }
@@ -478,7 +781,7 @@ class VM {
           {
             final b = pop();
             final a = pop();
-            if (!assertNumber(a, b)) return InterpretResult.RUNTIME_ERROR;
+            if (!assertNumber(a, b)) return result;
             push((a as double) * (b as double));
             break;
           }
@@ -487,8 +790,26 @@ class VM {
           {
             final b = pop();
             final a = pop();
-            if (!assertNumber(a, b)) return InterpretResult.RUNTIME_ERROR;
+            if (!assertNumber(a, b)) return result;
             push((a as double) / (b as double));
+            break;
+          }
+
+        case OpCode.POW:
+          {
+            final b = pop();
+            final a = pop();
+            if (!assertNumber(a, b)) return result;
+            push(pow(a as double, b as double));
+            break;
+          }
+
+        case OpCode.MOD:
+          {
+            final b = pop();
+            final a = pop();
+            if (!assertNumber(a, b)) return result;
+            push((a as double) % (b as double));
             break;
           }
 
@@ -498,16 +819,16 @@ class VM {
 
         case OpCode.NEGATE:
           if (!(peek(0) is double)) {
-            runtimeError('Operand must be a number.');
-            return InterpretResult.RUNTIME_ERROR;
+            return runtimeError('Operand must be a number');
           }
           push(-(pop() as double));
           break;
 
         case OpCode.PRINT:
           {
-            printValue(pop());
-            stdout.writeln();
+            final val = valueToString(pop());
+            if (!silent) print(val);
+            stdout.writeln(val);
             break;
           }
 
@@ -536,7 +857,7 @@ class VM {
           {
             final argCount = readByte(frame);
             if (!callValue(peek(argCount), argCount)) {
-              return InterpretResult.RUNTIME_ERROR;
+              return result;
             }
             frame = frames[frameCount - 1];
             break;
@@ -547,7 +868,7 @@ class VM {
             final method = readString(frame);
             final argCount = readByte(frame);
             if (!invoke(method, argCount)) {
-              return InterpretResult.RUNTIME_ERROR;
+              return result;
             }
             frame = frames[frameCount - 1];
             break;
@@ -559,7 +880,7 @@ class VM {
             final argCount = readByte(frame);
             ObjClass superclass = pop();
             if (!invokeFromClass(superclass, method, argCount)) {
-              return InterpretResult.RUNTIME_ERROR;
+              return result;
             }
             frame = frames[frameCount - 1];
             break;
@@ -589,15 +910,15 @@ class VM {
 
         case OpCode.RETURN:
           {
-            final result = pop();
+            final res = pop();
             closeUpvalues(frame.slotsIdx);
             frameCount--;
             if (frameCount == 0) {
               pop();
-              return InterpretResult.OK;
+              return getResult(line, returnValue: res);
             }
             stackTop = frame.slotsIdx;
-            push(result);
+            push(res);
             frame = frames[frameCount - 1];
             break;
           }
@@ -610,8 +931,7 @@ class VM {
           {
             final sup = peek(1);
             if (!(sup is ObjClass)) {
-              runtimeError('Superclass must be a class.');
-              return InterpretResult.RUNTIME_ERROR;
+              return runtimeError('Superclass must be a class');
             }
             ObjClass superclass = sup;
             ObjClass subclass = peek(0);
@@ -634,11 +954,29 @@ class VM {
           push(arr);
           break;
 
+        case OpCode.LIST_INIT_RANGE:
+          if (!(peek(0) is double) || !(peek(1) is double)) {
+            return runtimeError('List initializer bounds must be number');
+          }
+          final start = peek(1) as double;
+          final end = peek(0) as double;
+          if (end - start == double.infinity) {
+            return runtimeError('Invalid list initializer');
+          }
+          final arr = [];
+          for (var k = start; k < end; k++) {
+            arr.add(k);
+          }
+          stackTop -= 2;
+          push(arr);
+          break;
+
         case OpCode.MAP_INIT:
           final valCount = readByte(frame);
           final map = {};
           for (var k = 0; k < valCount; k++) {
-            map[peek(valCount - 2 * k + 1)] = peek(valCount - 2 * k);
+            map[peek((valCount - k - 1) * 2 + 1)] =
+                peek((valCount - k - 1) * 2);
           }
           stackTop -= 2 * valCount;
           push(map);
@@ -649,13 +987,19 @@ class VM {
             final idxObj = pop();
             final container = pop();
             if (container is List) {
-              final idx = checkIndex(container, idxObj);
+              final idx = checkIndex(container.length, idxObj);
+              if (idx == null) return result;
               push(container[idx]);
             } else if (container is Map) {
               push(container[idxObj]);
+            } else if (container is String) {
+              final idx = checkIndex(container.length, idxObj);
+              if (idx == null) return result;
+              push(container[idx]);
             } else {
-              runtimeError('Indexing targets must be Lists or Maps');
-              return InterpretResult.RUNTIME_ERROR;
+              return runtimeError(
+                'Indexing targets must be Strings, Lists or Maps',
+              );
             }
             break;
           }
@@ -666,58 +1010,156 @@ class VM {
             final idxObj = pop();
             final container = pop();
             if (container is List) {
-              final idx = checkIndex(container, idxObj);
+              final idx = checkIndex(container.length, idxObj);
+              if (idx == null) return result;
               container[idx] = val;
             } else if (container is Map) {
               container[idxObj] = val;
             } else {
-              runtimeError('Indexing targets must be Lists or Maps');
-              return InterpretResult.RUNTIME_ERROR;
+              return runtimeError('Indexing targets must be Lists or Maps');
             }
             push(val);
             break;
           }
+
+        case OpCode.CONTAINER_GET_RANGE:
+          {
+            var bIdx = pop();
+            var aIdx = pop();
+            final container = pop();
+            var length = 0;
+            if (container is List) {
+              length = container.length;
+            } else if (container is String) {
+              length = container.length;
+            } else {
+              return runtimeError(
+                  'Range indexing targets must be Lists or Strings');
+            }
+            aIdx = checkIndex(length, aIdx);
+            bIdx = checkIndex(length, bIdx, fromStart: false);
+            if (aIdx == null || bIdx == null) return result;
+            if (container is List) {
+              push(container.sublist(aIdx, bIdx));
+            } else if (container is String) {
+              push(container.substring(aIdx, bIdx));
+            }
+            break;
+          }
+
+        case OpCode.CONTAINER_ITERATE:
+          {
+            // Retrieve values
+            final keyOpIdx = readByte(frame);
+            final valOpIdx = readByte(frame);
+            final keyIdx = frame.chunk.code[keyOpIdx];
+            final valIdx = frame.chunk.code[valOpIdx];
+            // print("code: ${frame.chunk.code}");
+            // print("key op idx: $keyOpIdx val op idx $valOpIdx");
+            // print("KEY IDX: $keyIdx valIdx $valIdx");
+            final idxIdx = valIdx + 1;
+            final iterableIdx = valIdx + 2;
+            // Retreive data
+            var idxObj = stack[frame.slotsIdx + idxIdx];
+            // Initialize
+            if (idxObj == Nil) {
+              final containerIdx = valIdx + 3;
+              final container = stack[frame.slotsIdx + containerIdx];
+              idxObj = 0.0;
+              if (container is String) {
+                stack[frame.slotsIdx + iterableIdx] = container.split('');
+              } else if (container is List) {
+                stack[frame.slotsIdx + iterableIdx] = container;
+              } else if (container is Map) {
+                stack[frame.slotsIdx + iterableIdx] =
+                    container.entries.toList();
+              } else {
+                return runtimeError('Iterable must be Strings, Lists or Maps');
+              }
+              // Pop from stack
+              pop();
+            }
+            // Iterate
+            double idx = idxObj;
+            final iterable = stack[frame.slotsIdx + iterableIdx] as List;
+            if (idx >= iterable.length) {
+              // Return early
+              push(false);
+              break;
+            }
+            // Populate key & value
+            final item = iterable[idx.toInt()];
+            if (item is MapEntry) {
+              stack[frame.slotsIdx + keyIdx] = item.key;
+              stack[frame.slotsIdx + valIdx] = item.value;
+            } else {
+              stack[frame.slotsIdx + keyIdx] = idx;
+              stack[frame.slotsIdx + valIdx] = item;
+            }
+            // Emit events
+            vmSetValue(frame, stack[frame.slotsIdx + keyIdx], ip: keyOpIdx);
+            vmSetValue(frame, stack[frame.slotsIdx + valIdx], ip: valOpIdx);
+            // Increment index
+            stack[frame.slotsIdx + idxIdx] = idx + 1;
+            push(true);
+            break;
+          }
       }
     }
+    return null;
   }
 
-  InterpretResult interpret(String source) {
-    final function = Compiler.compile(source);
-    if (function == null) return InterpretResult.COMPILE_ERROR;
-    push(function);
-    final closure = ObjClosure(function);
-    pop();
-    push(closure);
-    callValue(closure, 0);
-    return run();
+  Map<Token, Object> valueSnapshot() {
+    final tokenValues = <Token, Object>{};
+    final fromFrame = max(0, frameCount - 1);
+    final hasFirstFrame = frames.first.closure != null;
+    for (var f = fromFrame; f >= 0 && hasFirstFrame; f--) {
+      final frame = frames[f];
+      final tracer = compilerResult.tracer;
+      final upvalues = frame.closure.upvalues;
+      var localIdx = 1;
+      for (var i = 0; i < frame.ip; i++) {
+        final trace = frame.chunk.trace[i];
+        final token = trace.token;
+        final root = tracer.getVariableRoot(token);
+        final op = i > 0 ? OpCode.values[frame.chunk.code[i - 1]] : null;
+        final arg = frame.chunk.code[i];
+        if (trace.type == TraceEventType.VARIABLE_GET) {
+          // Treat upvalue differently
+          if (op == OpCode.GET_UPVALUE && upvalues[arg].location == null) {
+            tokenValues[root] = upvalues[arg].closed;
+          }
+          // activeTokens.add(token);
+          tokenValues[token] = tokenValues[root];
+        } else if (trace.type == TraceEventType.VARIABLE_SET) {
+          // Set token value based on variable type
+          if (op == OpCode.SET_UPVALUE && upvalues[arg].location == null) {
+            tokenValues[root] = upvalues[arg].closed;
+          } else if (op == OpCode.DEFINE_GLOBAL) {
+            tokenValues[root] = globals.getVal(root.str);
+          } else if (op == OpCode.TRACER_DEFINE_LOCAL) {
+            tokenValues[root] = stack[frame.slotsIdx + localIdx++];
+          }
+          // activeTokens.add(token);
+          tokenValues[token] = tokenValues[root];
+        }
+      }
+    }
+    return tokenValues;
   }
 
-  void runtimeError(String format, [List<Object> args]) {
-    stderr.writeln(sprintf(format, args ?? []));
-
-    for (var i = frameCount - 1; i >= 0; i--) {
+  InterpreterResult runtimeError(String format, [List<Object> args]) {
+    var error = addError(sprintf(format, args ?? []));
+    for (var i = frameCount - 2; i >= 0; i--) {
       final frame = frames[i];
       final function = frame.closure.function;
-      // -1 because the IP is sitting on the next instruction to be
-      // executed.
-      // int instruction = frame.ip - function.chunk.code - 1;
-      final instruction = frame.ip - 1;
-      stderr.write('[line ${function.chunk.lines[instruction]}] in ');
-      if (function.name == null) {
-        stderr.writeln('script');
-      } else {
-        stderr.writeln(
-          '${function.name}()',
-        );
-      }
+      // frame.ip is sitting on the next instruction
+      final traceEvent = function.chunk.trace[frame.ip - 1];
+      final loc = traceEvent.token.loc;
+      final fun = function.name == null ? 'script' : '${function.name}()';
+      final msg = 'ERROR [line ${loc.i}] in $fun';
+      error = addError(msg, link: error);
     }
-    resetStack();
+    return result;
   }
-
-  // void hack(bool b) {
-  //   // Hack to avoid unused function error. run() is not used in the
-  //   // scanning chapter.
-  //   run();
-  //   if (b) hack(false);
-  // }
 }

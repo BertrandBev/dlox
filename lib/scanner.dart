@@ -1,5 +1,9 @@
+import 'package:sprintf/sprintf.dart';
+import 'common.dart';
+import 'debug.dart';
+
 enum TokenType {
-  // Single-Stringacter tokens.
+  // Single-char tokens.
   LEFT_PAREN,
   RIGHT_PAREN,
   LEFT_BRACE,
@@ -14,8 +18,10 @@ enum TokenType {
   SLASH,
   STAR,
   COLUMN,
+  PERCENT,
+  CARET,
 
-  // One or two Stringacter tokens.
+  // One or two char tokens.
   BANG,
   BANG_EQUAL,
   EQUAL,
@@ -29,6 +35,7 @@ enum TokenType {
   IDENTIFIER,
   STRING,
   NUMBER,
+  OBJECT,
 
   // Keywords.
   AND,
@@ -48,40 +55,206 @@ enum TokenType {
   VAR,
   WHILE,
   IN,
+  BREAK, // TODO: add in dlox?
+  CONTINUE, // TODO: add in dlox?
 
+  // Editor syntactic sugar & helpers (dummy tokens)
   ERROR,
-  EOF
+  COMMENT,
+  EOF,
+  ELIF,
+  NLINE,
+}
+
+const TOKEN_REPR = {
+  // Symbols
+  TokenType.LEFT_PAREN: '(',
+  TokenType.RIGHT_PAREN: ')',
+  TokenType.LEFT_BRACE: '{',
+  TokenType.RIGHT_BRACE: '}',
+  TokenType.LEFT_BRACK: '[',
+  TokenType.RIGHT_BRACK: ']',
+  TokenType.COMMA: ',',
+  TokenType.DOT: '.',
+  TokenType.SEMICOLON: ';',
+  TokenType.COLUMN: ':',
+  TokenType.BANG: '!',
+
+  // Operators
+  TokenType.MINUS: '-',
+  TokenType.PLUS: '+',
+  TokenType.SLASH: '/',
+  TokenType.STAR: '*',
+  TokenType.PERCENT: '%',
+  TokenType.CARET: '^',
+  TokenType.EQUAL: '=',
+  TokenType.AND: '&',
+  TokenType.OR: '|',
+
+  // Comparators
+  TokenType.BANG_EQUAL: '!=',
+  TokenType.EQUAL_EQUAL: '==',
+  TokenType.GREATER: '>',
+  TokenType.GREATER_EQUAL: '>=',
+  TokenType.LESS: '<',
+  TokenType.LESS_EQUAL: '<=',
+
+  // Literals
+  TokenType.IDENTIFIER: '<identifier>',
+  TokenType.STRING: '<str>',
+  TokenType.NUMBER: '<num>',
+  TokenType.OBJECT: '<obj>',
+
+  // Keywords
+  TokenType.CLASS: 'class',
+  TokenType.ELSE: 'else',
+  TokenType.FALSE: 'false',
+  TokenType.FOR: 'for',
+  TokenType.FUN: 'fun',
+  TokenType.IF: 'if',
+  TokenType.NIL: 'nil',
+  TokenType.PRINT: 'print',
+  TokenType.RETURN: 'rtn',
+  TokenType.SUPER: 'super',
+  TokenType.THIS: 'this',
+  TokenType.TRUE: 'true',
+  TokenType.VAR: 'var',
+  TokenType.WHILE: 'while',
+  TokenType.IN: 'in',
+  TokenType.BREAK: 'break',
+  TokenType.CONTINUE: 'continue',
+
+  // Editor syntactic sugar (dummy tokens)
+  TokenType.COMMENT: '<//>',
+  TokenType.ELIF: 'elif',
+  TokenType.EOF: 'eof',
+  TokenType.NLINE: 'nline',
+  TokenType.ERROR: '<error>',
+};
+
+class Loc {
+  final int i, j;
+
+  const Loc(this.i, this.j);
+
+  Loc get right => Loc(i, j + 1);
+
+  Loc get left => Loc(i, j - 1);
+
+  Loc get top => Loc(i - 1, 0);
+
+  Loc get bottom => Loc(i + 1, 0);
+
+  bool after(Loc other) {
+    return other != null && (i > other.i || (i == other.i && j > other.j));
+  }
+
+  @override
+  String toString() {
+    return '$i:$j';
+  }
+
+  @override
+  bool operator ==(other) {
+    return (other is Loc) && other.i == i && other.j == j;
+  }
+
+  @override
+  int get hashCode => i.hashCode ^ j.hashCode;
 }
 
 class Token {
-  TokenType type;
-  String str;
-  int start;
-  int line;
+  final TokenType type;
+  final String str;
+  final Loc loc;
+  final Object val;
 
-  Token(this.type, this.str, this.start, this.line);
+  const Token(this.type, {this.str, this.val, this.loc = const Loc(-1, -1)});
+
+  Token copyWidth({TokenType type, String str, Loc loc, Object val}) {
+    return Token(
+      type ?? this.type,
+      loc: loc ?? this.loc,
+      str: str ?? this.str,
+      val: val ?? this.val,
+    );
+  }
 
   bool strEqual(Token other) {
     return other.str == str;
   }
+
+  String get info {
+    return '<${toString()} at $loc>';
+  }
+
+  @override
+  String toString() {
+    if (!TOKEN_REPR.containsKey(type)) {
+      throw Exception('Representation not found: $type');
+    }
+    if (type == TokenType.EOF) return '';
+    if (type == TokenType.NUMBER ||
+        type == TokenType.STRING ||
+        type == TokenType.IDENTIFIER) return this.str;
+    return TOKEN_REPR[type];
+  }
+
+  @override
+  bool operator ==(o) =>
+      o is Token && o.type == type && o.loc == loc && o.str == str;
+
+  @override
+  int get hashCode => type.hashCode ^ loc.hashCode ^ str.hashCode;
 }
 
 class Scanner {
   String source;
   int start = 0;
   int current = 0;
-  int line = 1;
+  Loc loc = Loc(0, 0);
+  // Mark line as comment
+  bool commentLine = false;
 
-  Scanner(this.source);
+  Scanner._(this.source);
+
+  static List<Token> scan(String source, {bool eof = true}) {
+    final scanner = Scanner._(source);
+    var tokens = <Token>[];
+    do {
+      tokens.add(scanner.scanToken());
+    } while (tokens.last.type != TokenType.EOF);
+    if (!eof) tokens.removeLast();
+    if (DEBUG_TRACE_SCANNER) {
+      var line = -1;
+      tokens.forEach((token) {
+        if (token.loc.i != line) {
+          stdwrite(sprintf('%4d ', [token.loc.i]));
+          line = token.loc.i;
+        } else {
+          stdwrite('   | ');
+        }
+        stdwrite(sprintf("%2d '%s'\n", [token.type.index, token.str]));
+      });
+    }
+    return tokens;
+  }
 
   static bool isDigit(String c) {
+    if (c == null) return false;
     return '0'.compareTo(c) <= 0 && '9'.compareTo(c) >= 0;
   }
 
   static bool isAlpha(String c) {
+    if (c == null) return false;
     return ('a'.compareTo(c) <= 0 && 'z'.compareTo(c) >= 0) ||
         ('A'.compareTo(c) <= 0 && 'Z'.compareTo(c) >= 0) ||
         (c == '_');
+  }
+
+  void newLine() {
+    loc = Loc(loc.i + 1, 0);
+    commentLine = false;
   }
 
   bool get isAtEnd {
@@ -115,12 +288,15 @@ class Scanner {
   }
 
   Token makeToken(TokenType type) {
-    final str = source.substring(start, current);
-    return Token(type, str, start, line);
+    var str = source.substring(start, current);
+    if (type == TokenType.STRING) str = str.substring(1, str.length - 1);
+    final token = Token(type, loc: loc, str: str);
+    loc = Loc(loc.i, loc.j + 1);
+    return token;
   }
 
   Token errorToken(String message) {
-    return Token(TokenType.ERROR, message, -1, line);
+    return Token(TokenType.ERROR, loc: loc, str: message);
   }
 
   void skipWhitespace() {
@@ -134,19 +310,8 @@ class Scanner {
           break;
 
         case '\n':
-          line++;
+          newLine();
           advance();
-          break;
-
-        case '/':
-          if (peekNext == '/') {
-            // A comment goes until the end of the line.
-            while (peek != '\n' && !isAtEnd) {
-              advance();
-            }
-          } else {
-            return;
-          }
           break;
 
         default:
@@ -166,10 +331,18 @@ class Scanner {
 
   TokenType identifierType() {
     switch (charAt(start)) {
-      case 'a':
-        return checkKeyword(1, 2, 'nd', TokenType.AND);
+      case 'b':
+        return checkKeyword(1, 4, 'reak', TokenType.BREAK);
       case 'c':
-        return checkKeyword(1, 4, 'lass', TokenType.CLASS);
+        if (current - start > 1) {
+          switch (charAt(start + 1)) {
+            case 'l':
+              return checkKeyword(2, 3, 'ass', TokenType.CLASS);
+            case 'o':
+              return checkKeyword(2, 6, 'ntinue', TokenType.CONTINUE);
+          }
+        }
+        break;
       case 'e':
         return checkKeyword(1, 3, 'lse', TokenType.ELSE);
       case 'f':
@@ -188,16 +361,14 @@ class Scanner {
         if (current - start > 1) {
           switch (charAt(start + 1)) {
             case 'f':
-              return TokenType.IF;
+              return checkKeyword(2, 0, '', TokenType.IF);
             case 'n':
-              return TokenType.IN;
+              return checkKeyword(2, 0, '', TokenType.IN);
           }
         }
         break;
       case 'n':
         return checkKeyword(1, 2, 'il', TokenType.NIL);
-      case 'o':
-        return checkKeyword(1, 1, 'r', TokenType.OR);
       case 'p':
         return checkKeyword(1, 4, 'rint', TokenType.PRINT);
       case 'r':
@@ -250,7 +421,7 @@ class Scanner {
 
   Token string() {
     while (peek != '"' && !isAtEnd) {
-      if (peek == '\n') line++;
+      if (peek == '\n') newLine();
       advance();
     }
 
@@ -259,6 +430,13 @@ class Scanner {
     // The closing quote.
     advance();
     return makeToken(TokenType.STRING);
+  }
+
+  Token comment() {
+    while (peek != ' ' && peek != '\n' && !isAtEnd) {
+      advance();
+    }
+    return makeToken(TokenType.COMMENT);
   }
 
   Token scanToken() {
@@ -270,6 +448,12 @@ class Scanner {
 
     final c = advance();
 
+    if (c == '/' && match('/')) {
+      // Consume comment
+      commentLine = true;
+      return scanToken();
+    }
+    if (commentLine) return comment();
     if (isAlpha(c)) return identifier();
     if (isDigit(c)) return number();
 
@@ -313,10 +497,16 @@ class Scanner {
         return string();
       case ':':
         return makeToken(TokenType.COLUMN);
+      case '%':
+        return makeToken(TokenType.PERCENT);
+      case '^':
+        return makeToken(TokenType.CARET);
+      case '&':
+        return makeToken(TokenType.AND);
+      case '|':
+        return makeToken(TokenType.OR);
     }
 
     return errorToken('Unexpected character: $c.');
   }
 }
-
-Scanner scanner;

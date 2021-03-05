@@ -1,66 +1,90 @@
-import 'dart:io';
-
 import 'package:dlox/chunk.dart';
 import 'package:dlox/object.dart';
 import 'package:dlox/value.dart';
 import 'package:sprintf/sprintf.dart';
 
-void disassembleChunk(Chunk chunk, String name) {
-  stdout.write(sprintf('== %s ==\n', [name]));
+final stdoutBuf = StringBuffer();
 
+void stdwrite(String string) {
+  final split = string.split('\n');
+  if (split.isNotEmpty) stdoutBuf.write(split.removeAt(0));
+  while (split.isNotEmpty) {
+    print(stdoutBuf.toString());
+    stdoutBuf.clear();
+    stdoutBuf.write(split.removeAt(0));
+  }
+}
+
+void stdwriteln([String string]) {
+  return stdwrite((string ?? '') + '\n');
+}
+
+void printValue(Object value) {
+  stdwrite(valueToString(value));
+}
+
+void disassembleChunk(Chunk chunk, String name) {
+  stdwrite(sprintf('== %s ==\n', [name]));
+
+  var prevLine = -1;
   for (var offset = 0; offset < chunk.code.length;) {
-    offset = disassembleInstruction(chunk, offset);
+    offset = disassembleInstruction(prevLine, chunk, offset);
+    final prevLoc = offset > 0 ? chunk.trace[offset - 1].token.loc : null;
+    prevLine = prevLoc.i;
   }
 }
 
 int constantInstruction(String name, Chunk chunk, int offset) {
   final constant = chunk.code[offset + 1];
-  stdout.write(sprintf('%-16s %4d \'', [name, constant]));
+  stdwrite(sprintf('%-16s %4d \'', [name, constant]));
   printValue(chunk.constants[constant]);
-  stdout.write('\'\n');
+  stdwrite('\'\n');
   return offset + 2;
 }
 
 int initializerListInstruction(String name, Chunk chunk, int offset) {
   final nArgs = chunk.code[offset + 1];
-  stdout.writeln(sprintf('%-16s %4d', [name, nArgs]));
+  stdwriteln(sprintf('%-16s %4d', [name, nArgs]));
   return offset + 2;
 }
 
 int invokeInstruction(String name, Chunk chunk, int offset) {
   final constant = chunk.code[offset + 1];
   final argCount = chunk.code[offset + 2];
-  stdout.write(sprintf('%-16s (%d args) %4d \'', [name, argCount, constant]));
+  stdwrite(sprintf('%-16s (%d args) %4d \'', [name, argCount, constant]));
   printValue(chunk.constants[constant]);
-  stdout.write('\'\n');
+  stdwrite('\'\n');
   return offset + 3;
 }
 
 int simpleInstruction(String name, int offset) {
-  stdout.write(sprintf('%s\n', [name]));
+  stdwrite(sprintf('%s\n', [name]));
   return offset + 1;
 }
 
 int byteInstruction(String name, Chunk chunk, int offset) {
   final slot = chunk.code[offset + 1];
-  stdout.write(sprintf('%-16s %4d\n', [name, slot]));
+  stdwrite(sprintf('%-16s %4d\n', [name, slot]));
   return offset + 2; // [debug]
 }
 
 int jumpInstruction(String name, int sign, Chunk chunk, int offset) {
   var jump = chunk.code[offset + 1] << 8;
   jump |= chunk.code[offset + 2];
-  stdout.write(
+  stdwrite(
       sprintf('%-16s %4d -> %d\n', [name, offset, offset + 3 + sign * jump]));
   return offset + 3;
 }
 
-int disassembleInstruction(Chunk chunk, int offset) {
-  stdout.write(sprintf('%04d ', [offset]));
-  if (offset > 0 && chunk.lines[offset] == chunk.lines[offset - 1]) {
-    stdout.write('   | ');
+int disassembleInstruction(int prevLine, Chunk chunk, int offset) {
+  stdwrite(sprintf('%04d ', [offset]));
+  final loc = chunk.trace[offset].token.loc;
+  // stdwrite("${chunk.trace[offset].token.info} "); // temp
+  // final prevLoc = offset > 0 ? chunk.trace[offset - 1].token.loc : null;
+  if (offset > 0 && loc.i == prevLine) {
+    stdwrite('   | ');
   } else {
-    stdout.write(sprintf('%4d ', [chunk.lines[offset]]));
+    stdwrite(sprintf('%4d ', [loc.i]));
   }
 
   final instruction = chunk.code[offset];
@@ -77,6 +101,8 @@ int disassembleInstruction(Chunk chunk, int offset) {
       return simpleInstruction('OP_POP', offset);
     case OpCode.GET_LOCAL:
       return byteInstruction('OP_GET_LOCAL', chunk, offset);
+    case OpCode.TRACER_DEFINE_LOCAL:
+      return byteInstruction('TRACER_DEFINE_LOCAL', chunk, offset);
     case OpCode.SET_LOCAL:
       return byteInstruction('OP_SET_LOCAL', chunk, offset);
     case OpCode.GET_GLOBAL:
@@ -131,14 +157,14 @@ int disassembleInstruction(Chunk chunk, int offset) {
       {
         offset++;
         final constant = chunk.code[offset++];
-        stdout.write(sprintf('%-16s %4d ', ['OP_CLOSURE', constant]));
+        stdwrite(sprintf('%-16s %4d ', ['OP_CLOSURE', constant]));
         printValue(chunk.constants[constant]);
-        stdout.write('\n');
+        stdwrite('\n');
         final function = chunk.constants[constant] as ObjFunction;
         for (var j = 0; j < function.upvalueCount; j++) {
           final isLocal = chunk.code[offset++] == 1;
           final index = chunk.code[offset++];
-          stdout.write(sprintf('%04d      |                     %s %d\n',
+          stdwrite(sprintf('%04d      |                     %s %d\n',
               [offset - 2, isLocal ? 'local' : 'upvalue', index]));
         }
 
@@ -156,14 +182,19 @@ int disassembleInstruction(Chunk chunk, int offset) {
       return constantInstruction('OP_METHOD', chunk, offset);
     case OpCode.LIST_INIT:
       return initializerListInstruction('OP_LIST_INIT', chunk, offset);
+    case OpCode.LIST_INIT_RANGE:
+      return simpleInstruction('LIST_INIT_RANGE', offset);
     case OpCode.MAP_INIT:
       return initializerListInstruction('OP_MAP_INIT', chunk, offset);
     case OpCode.CONTAINER_GET:
       return simpleInstruction('OP_CONTAINER_GET', offset);
     case OpCode.CONTAINER_SET:
       return simpleInstruction('OP_CONTAINER_SET', offset);
+    case OpCode.CONTAINER_GET_RANGE:
+      return simpleInstruction('CONTAINER_GET_RANGE', offset);
+    case OpCode.CONTAINER_ITERATE:
+      return simpleInstruction('CONTAINER_ITERATE', offset);
     default:
-      print('Unknown opcode $instruction');
-      return offset + 1;
+      throw Exception('Unknown opcode $instruction');
   }
 }
