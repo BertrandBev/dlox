@@ -1,7 +1,10 @@
+import 'package:demo/editor_toolbar.dart';
 import 'package:demo/monitor.dart';
 import 'package:demo/runtime.dart';
 import 'package:demo/runtime_toolbar.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_icons/flutter_icons.dart';
 import 'package:provider/provider.dart';
 
 import 'code_editor.dart';
@@ -46,7 +49,6 @@ class _HomePageState extends State<HomePage> {
     runtime = Runtime(
       getSource: () => editorKey.currentState?.source,
       onCompilerResult: (res) {
-        runtime.clearOutput();
         editorKey.currentState?.setCompilerResult(res);
       },
       onInterpreterResult: (res) {
@@ -74,13 +76,31 @@ class _HomePageState extends State<HomePage> {
         onCodeChange: () {
           runtime.codeChanged();
         });
-    final stdoutMonitor = Monitor(runtime.stdout, key: stdoutKey);
-    final compilerMonitor = Monitor(runtime.compilerOut, key: compilerKey);
-    final vmMonitor = Monitor(runtime.vmOut, key: vmKey);
-    final toolbar = Toolbar(
+
+    final stdoutMonitor = Monitor(
+      key: stdoutKey,
+      lines: runtime.stdout,
+      icon: MaterialCommunityIcons.monitor,
+      title: "Terminal",
+    );
+    final compilerMonitor = Monitor(
+      autoScroll: false,
+      key: compilerKey,
+      lines: runtime.compilerOut,
+      icon: MaterialCommunityIcons.matrix,
+      title: "Bytecode",
+    );
+    final vmMonitor = Monitor(
+      key: vmKey,
+      lines: runtime.vmOut,
+      icon: MaterialCommunityIcons.magnify,
+      title: "VM trace",
+    );
+    final runtimeToolbar = RuntimeToolbar(
       layout: layout,
       onClear: () => runtime.clearOutput(),
     );
+    final editorToolbar = EditorToolbar(layout: layout);
 
     final topRow = Row(children: [
       if (layout.showEditor) Expanded(child: codeEditor),
@@ -97,15 +117,13 @@ class _HomePageState extends State<HomePage> {
     ]);
 
     final body = Column(children: [
+      editorToolbar,
       Expanded(flex: 2, child: topRow),
-      toolbar,
+      runtimeToolbar,
       Expanded(flex: 1, child: bottomRow),
     ]);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
       body: MultiProvider(
         providers: [ListenableProvider.value(value: runtime)],
         child: body,

@@ -6,17 +6,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_icons/flutter_icons.dart';
 import 'package:provider/provider.dart';
 
-class Toolbar extends StatefulWidget {
+class RuntimeToolbar extends StatefulWidget {
   final Layout layout;
   final Function onClear;
 
-  const Toolbar({Key key, this.layout, this.onClear}) : super(key: key);
+  const RuntimeToolbar({Key key, this.layout, this.onClear}) : super(key: key);
 
   @override
-  _ToolbarState createState() => _ToolbarState();
+  _RuntimeToolbarState createState() => _RuntimeToolbarState();
 }
 
-class _ToolbarState extends State<Toolbar> {
+class _RuntimeToolbarState extends State<RuntimeToolbar> {
   Widget buildRunBtn(BuildContext context) {
     final runtime = context.watch<Runtime>();
     final running = runtime.running;
@@ -74,7 +74,6 @@ class _ToolbarState extends State<Toolbar> {
 
     final row = Row(
       children: [
-        // compileBtn,
         stepBtn,
         runBtn,
         clearBtn,

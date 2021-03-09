@@ -39,7 +39,7 @@ class Runtime extends ChangeNotifier {
 
   void _populateBuffer(List<String> buf, String str) {
     if (str == null) return;
-    str.trim().split("\n").forEach((line) {
+    str.trim().split("\n").where((line) => line.isNotEmpty).forEach((line) {
       buf.add(line);
     });
     notifyListeners();
@@ -50,6 +50,7 @@ class Runtime extends ChangeNotifier {
     errors.forEach((err) {
       _populateBuffer(stdout, err.toString());
     });
+    notifyListeners();
   }
 
   void clearOutput() {
@@ -82,9 +83,11 @@ class Runtime extends ChangeNotifier {
     final tokens = Scanner.scan(source);
     compilerResult = Compiler.compile(tokens, silent: true);
     compiledSource = source;
+    // Clear monitors
+    compilerOut.clear();
+    clearOutput();
     // Populate result
     final str = compilerResult.debug.buf.toString();
-    compilerOut.clear();
     _populateBuffer(compilerOut, str);
     _processErrors(compilerResult.errors);
     onCompilerResult(compilerResult);

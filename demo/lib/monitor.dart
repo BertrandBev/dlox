@@ -6,8 +6,17 @@ import 'package:provider/provider.dart';
 
 class Monitor extends StatefulWidget {
   final List<String> lines;
+  final IconData icon;
+  final String title;
+  final bool autoScroll;
 
-  Monitor(this.lines, {Key key}) : super(key: key);
+  Monitor({
+    Key key,
+    this.lines,
+    this.icon,
+    this.title,
+    this.autoScroll = true,
+  }) : super(key: key);
 
   @override
   MonitorState createState() => MonitorState();
@@ -16,22 +25,19 @@ class Monitor extends StatefulWidget {
 class MonitorState extends State<Monitor> {
   final ScrollController _scrollController = ScrollController();
 
-  void autoScroll() async {
-    await Future.delayed(Duration(milliseconds: 50));
-    _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-  }
-
   @override
   Widget build(BuildContext context) {
     context.watch<Runtime>();
-    autoScroll();
     final lv = ListView.builder(
+      shrinkWrap: true,
       controller: _scrollController,
       padding: EdgeInsets.all(8.0),
       itemCount: widget.lines.length,
+      reverse: widget.autoScroll,
       itemBuilder: (context, k) {
+        final idx = widget.autoScroll ? widget.lines.length - k - 1 : k;
         final parsed = ParsedText(
-          text: widget.lines[k],
+          text: widget.lines[idx],
           style: TextStyle(
             color: Colors.grey.shade200,
             fontSize: 16.0,
@@ -70,9 +76,31 @@ class MonitorState extends State<Monitor> {
         );
       },
     );
+    final col = Column(children: [
+      Flexible(child: lv),
+    ]);
+    final placeholder = Center(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            widget.icon,
+            color: Colors.grey.shade300,
+          ),
+          SizedBox(width: 20.0),
+          Text(
+            widget.title,
+            style: TextStyle(
+              color: Colors.grey.shade300,
+              fontSize: 16.0,
+            ),
+          ),
+        ],
+      ),
+    );
     return Container(
       color: ColorTheme.terminal,
-      child: lv,
+      child: widget.lines.isEmpty ? placeholder : col,
     );
   }
 }
