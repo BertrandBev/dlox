@@ -10,19 +10,26 @@ class LangError {
   LangError(this.type, this.token, this.msg);
 
   void dump(Debug debug) {
+    debug.stdwriteln(toString());
+  }
+
+  @override
+  String toString() {
+    final buf = StringBuffer();
     if (token == null) {
-      debug.stdwriteln('$type error: $msg');
-      return;
+      buf.write('$type error: $msg');
+      return buf.toString();
     }
-    debug.stdwrite('[${token.loc}] $type error');
+    buf.write('[${token.loc.i + 1}:${token.loc.j}] $type error');
     if (token.type == TokenType.EOF) {
-      debug.stdwrite(' at end');
+      buf.write(' at end');
     } else if (token.type == TokenType.ERROR) {
       // Nothing.
     } else {
-      debug.stdwrite(' at \'${token.str}\'');
+      buf.write(' at \'${token.str}\'');
     }
-    debug.stdwrite(': $msg\n');
+    buf.write(': $msg');
+    return buf.toString();
   }
 }
 

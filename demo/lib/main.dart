@@ -1,6 +1,7 @@
 import 'package:demo/monitor.dart';
 import 'package:demo/runtime.dart';
 import 'package:demo/toolbar.dart';
+import 'package:dlox/error.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -46,22 +47,51 @@ class _HomePageState extends State<HomePage> {
       getSource: () => editorKey.currentState?.source,
       onStdout: (lines) => stdoutKey.currentState?.addLines(lines),
       onDebugOut: (lines) => vmKey.currentState?.addLines(lines),
-      onCompiled: (res) {
-        stdoutKey.currentState?.clear();
-        vmKey.currentState?.clear();
+      onCompilerResult: (res) {
+        _clearOutput();
+        // Set compiler output
         final compilerOut = res?.debug?.buf?.toString();
+        compilerKey.currentState?.clear();
         compilerKey.currentState?.addLines(compilerOut);
+        editorKey.currentState?.setCompilerResult(res);
+        _processErrors(res?.errors);
+      },
+      onInterpreterResult: (res) {
+        editorKey.currentState?.setInterpreterResult(res);
+        _processErrors(res?.errors);
       },
     );
   }
 
   @override
+  void dispose() {
+    runtime.dispose();
+    super.dispose();
+  }
+
+  void _clearOutput() {
+    stdoutKey.currentState?.clear();
+    vmKey.currentState?.clear();
+  }
+
+  void _processErrors(List<LangError> errors) {
+    if (errors == null) return;
+    errors.forEach((err) {
+      stdoutKey.currentState?.addLines(err.toString());
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final codeEditor = CodeEditor(key: editorKey);
+    final codeEditor = CodeEditor(
+        key: editorKey,
+        onCodeChange: () {
+          runtime.codeChanged();
+        });
     final stdoutMonitor = Monitor(key: stdoutKey);
     final compilerMonitor = Monitor(key: compilerKey);
     final vmMonitor = Monitor(key: vmKey);
-    final toolbar = Toolbar();
+    final toolbar = Toolbar(onClear: _clearOutput);
 
     final topRow = Row(children: [
       Expanded(child: codeEditor),
@@ -76,15 +106,9 @@ class _HomePageState extends State<HomePage> {
     ]);
 
     final layout = Column(children: [
-      Expanded(
-        flex: 2,
-        child: topRow,
-      ),
+      Expanded(flex: 2, child: topRow),
       toolbar,
-      Expanded(
-        flex: 1,
-        child: bottomRow,
-      ),
+      Expanded(flex: 1, child: bottomRow),
     ]);
 
     return Scaffold(
