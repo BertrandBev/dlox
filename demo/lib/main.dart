@@ -1,7 +1,6 @@
 import 'package:demo/monitor.dart';
 import 'package:demo/runtime.dart';
-import 'package:demo/toolbar.dart';
-import 'package:dlox/error.dart';
+import 'package:demo/runtime_toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -38,6 +37,7 @@ class _HomePageState extends State<HomePage> {
   final stdoutKey = GlobalKey<MonitorState>();
   final compilerKey = GlobalKey<MonitorState>();
   final vmKey = GlobalKey<MonitorState>();
+  Layout layout;
   Runtime runtime;
 
   @override
@@ -45,22 +45,17 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     runtime = Runtime(
       getSource: () => editorKey.currentState?.source,
-      onStdout: (lines) => stdoutKey.currentState?.addLines(lines),
-      onDebugOut: (lines) => vmKey.currentState?.addLines(lines),
       onCompilerResult: (res) {
-        _clearOutput();
-        // Set compiler output
-        final compilerOut = res?.debug?.buf?.toString();
-        compilerKey.currentState?.clear();
-        compilerKey.currentState?.addLines(compilerOut);
+        runtime.clearOutput();
         editorKey.currentState?.setCompilerResult(res);
-        _processErrors(res?.errors);
       },
       onInterpreterResult: (res) {
         editorKey.currentState?.setInterpreterResult(res);
-        _processErrors(res?.errors);
       },
     );
+    layout = Layout(() {
+      Future.microtask(() => setState(() {}));
+    });
   }
 
   @override
@@ -69,43 +64,39 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  void _clearOutput() {
-    stdoutKey.currentState?.clear();
-    vmKey.currentState?.clear();
-  }
-
-  void _processErrors(List<LangError> errors) {
-    if (errors == null) return;
-    errors.forEach((err) {
-      stdoutKey.currentState?.addLines(err.toString());
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    final queryData = MediaQuery.of(context);
+    layout.setScreenSize(queryData.size);
+
     final codeEditor = CodeEditor(
         key: editorKey,
         onCodeChange: () {
           runtime.codeChanged();
         });
-    final stdoutMonitor = Monitor(key: stdoutKey);
-    final compilerMonitor = Monitor(key: compilerKey);
-    final vmMonitor = Monitor(key: vmKey);
-    final toolbar = Toolbar(onClear: _clearOutput);
+    final stdoutMonitor = Monitor(runtime.stdout, key: stdoutKey);
+    final compilerMonitor = Monitor(runtime.compilerOut, key: compilerKey);
+    final vmMonitor = Monitor(runtime.vmOut, key: vmKey);
+    final toolbar = Toolbar(
+      layout: layout,
+      onClear: () => runtime.clearOutput(),
+    );
 
     final topRow = Row(children: [
-      Expanded(child: codeEditor),
-      VerticalDivider(width: 1, color: Colors.grey.shade900),
-      Expanded(child: compilerMonitor),
+      if (layout.showEditor) Expanded(child: codeEditor),
+      if (layout.showEditor && layout.showCompiler)
+        VerticalDivider(width: 0.5, color: Colors.grey.shade900),
+      if (layout.showCompiler) Expanded(child: compilerMonitor),
     ]);
 
     final bottomRow = Row(children: [
-      Expanded(child: stdoutMonitor),
-      VerticalDivider(width: 1, color: Colors.grey.shade900),
-      Expanded(child: vmMonitor),
+      if (layout.showStdout) Expanded(child: stdoutMonitor),
+      if (layout.showStdout && layout.showVm)
+        VerticalDivider(width: 0.5, color: Colors.grey.shade900),
+      if (layout.showVm) Expanded(child: vmMonitor),
     ]);
 
-    final layout = Column(children: [
+    final body = Column(children: [
       Expanded(flex: 2, child: topRow),
       toolbar,
       Expanded(flex: 1, child: bottomRow),
@@ -117,7 +108,7 @@ class _HomePageState extends State<HomePage> {
       ),
       body: MultiProvider(
         providers: [ListenableProvider.value(value: runtime)],
-        child: layout,
+        child: body,
       ),
     );
   }

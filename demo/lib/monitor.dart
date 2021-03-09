@@ -1,9 +1,13 @@
 import 'package:demo/constants.dart';
+import 'package:demo/runtime.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_parsed_text/flutter_parsed_text.dart';
+import 'package:provider/provider.dart';
 
 class Monitor extends StatefulWidget {
-  Monitor({Key key}) : super(key: key);
+  final List<String> lines;
+
+  Monitor(this.lines, {Key key}) : super(key: key);
 
   @override
   MonitorState createState() => MonitorState();
@@ -11,34 +15,23 @@ class Monitor extends StatefulWidget {
 
 class MonitorState extends State<Monitor> {
   final ScrollController _scrollController = ScrollController();
-  var items = <String>[];
 
-  void addLines(String lines) async {
-    if (lines == null || lines.isEmpty) return;
-    setState(() {
-      lines.trim().split("\n").forEach((line) {
-        items.add(line);
-      });
-    });
-    await Future.delayed(Duration(milliseconds: 100));
+  void autoScroll() async {
+    await Future.delayed(Duration(milliseconds: 50));
     _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-  }
-
-  void clear() {
-    setState(() {
-      items.clear();
-    });
   }
 
   @override
   Widget build(BuildContext context) {
+    context.watch<Runtime>();
+    autoScroll();
     final lv = ListView.builder(
       controller: _scrollController,
       padding: EdgeInsets.all(8.0),
-      itemCount: items.length,
+      itemCount: widget.lines.length,
       itemBuilder: (context, k) {
         final parsed = ParsedText(
-          text: items[k],
+          text: widget.lines[k],
           style: TextStyle(
             color: Colors.grey.shade200,
             fontSize: 16.0,
@@ -59,21 +52,15 @@ class MonitorState extends State<Monitor> {
             ),
             MatchText(
               pattern: r"==.+==",
-              style: TextStyle(
-                color: Colors.blue
-              ),
+              style: TextStyle(color: Colors.blue),
             ),
             MatchText(
               pattern: r"'.+'",
-              style: TextStyle(
-                color: Colors.yellow
-              ),
+              style: TextStyle(color: Colors.yellow),
             ),
             MatchText(
               pattern: r"true|false",
-              style: TextStyle(
-                color: Colors.red
-              ),
+              style: TextStyle(color: Colors.red),
             ),
           ],
         );

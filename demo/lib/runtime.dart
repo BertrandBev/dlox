@@ -9,8 +9,6 @@ import 'package:flutter/foundation.dart';
 class Runtime extends ChangeNotifier {
   // State hooks
   final String Function() getSource;
-  final Function(String) onStdout;
-  final Function(String) onDebugOut;
   final Function(CompilerResult) onCompilerResult;
   final Function(InterpreterResult) onInterpreterResult;
 
@@ -25,15 +23,39 @@ class Runtime extends ChangeNotifier {
   bool running = false;
   bool stopFlag = false;
 
+  // Buffers variables
+  final stdout = <String>[];
+  final vmOut = <String>[];
+  final compilerOut = <String>[];
+
   Runtime({
     this.getSource,
-    this.onStdout,
-    this.onDebugOut,
     this.onCompilerResult,
     this.onInterpreterResult,
   }) {
     vm = VM(silent: true);
     vm.traceExecution = true;
+  }
+
+  void _populateBuffer(List<String> buf, String str) {
+    if (str == null) return;
+    str.trim().split("\n").forEach((line) {
+      buf.add(line);
+    });
+    notifyListeners();
+  }
+
+  void _processErrors(List<LangError> errors) {
+    if (errors == null) return;
+    errors.forEach((err) {
+      _populateBuffer(stdout, err.toString());
+    });
+  }
+
+  void clearOutput() {
+    stdout.clear();
+    vmOut.clear();
+    notifyListeners();
   }
 
   void dispose() {
@@ -60,6 +82,11 @@ class Runtime extends ChangeNotifier {
     final tokens = Scanner.scan(source);
     compilerResult = Compiler.compile(tokens, silent: true);
     compiledSource = source;
+    // Populate result
+    final str = compilerResult.debug.buf.toString();
+    compilerOut.clear();
+    _populateBuffer(compilerOut, str);
+    _processErrors(compilerResult.errors);
     onCompilerResult(compilerResult);
   }
 
@@ -75,19 +102,24 @@ class Runtime extends ChangeNotifier {
     if (vm.compilerResult != compilerResult) {
       vm.setFunction(compilerResult, FunctionParams());
       interpreterResult = null;
-      onCompilerResult(compilerResult);
+      // onCompilerResult(compilerResult);
     }
     return true;
+  }
+
+  void _onInterpreterResult() {
+    _populateBuffer(stdout, vm.stdout.clear());
+    _populateBuffer(vmOut, vm.traceDebug.clear());
+    _processErrors(compilerResult.errors);
+    onInterpreterResult(interpreterResult);
+    notifyListeners();
   }
 
   bool step() {
     if (!_initCode() || done) return false;
     vm.stepCode = true;
     interpreterResult = vm.stepBatch();
-    onStdout(vm.stdout.clear());
-    onDebugOut(vm.traceDebug.clear());
-    onInterpreterResult(interpreterResult);
-    notifyListeners();
+    _onInterpreterResult();
     return true;
   }
 
@@ -103,12 +135,10 @@ class Runtime extends ChangeNotifier {
         // Cope with expensive tracing
         batchCount: vm.traceExecution ? 100 : 100000,
       );
-      onStdout(vm.stdout.clear());
-      onDebugOut(vm.traceDebug.clear());
+      _onInterpreterResult();
       await Future.delayed(Duration(seconds: 0));
     }
 
-    onInterpreterResult(interpreterResult);
     stopFlag = false;
     running = false;
     notifyListeners();
