@@ -43,45 +43,7 @@ class InterpreterResult {
     this.lastLine,
     this.stepCount,
     this.returnValue,
-  ) : this.errors = List<LangError>.from(errors);
-}
-
-// Public interface of the VM
-class SyncVM {
-  VM vm;
-
-  SyncVM({bool silent = false}) {
-    vm = VM();
-    vm.silent = silent;
-  }
-
-  // Public interface
-  bool get done {
-    return vm.done;
-  }
-
-  void setFunctionParams(CompilerResult compilerResult, FunctionParams params) {
-    vm.setFunction(compilerResult, params);
-  }
-
-  CompilerResult compile(List<Token> tokens) {
-    return Compiler.compile(tokens);
-  }
-
-  InterpreterResult _loop() {
-    InterpreterResult res;
-    do {
-      res = vm.stepBatch();
-    } while (res == null);
-    return res;
-  }
-
-  InterpreterResult run() {
-    if (vm.done) return null;
-    vm.stepCode = false;
-    vm.traceValues = true;
-    return _loop();
-  }
+  ) : errors = List<LangError>.from(errors);
 }
 
 class FunctionParams {
@@ -111,12 +73,17 @@ class VM {
   bool hasOp = false;
   final Map<Token, Object> tokenValues = {};
   // Debug API
+  bool traceExecution = false;
   bool traceValues = false;
   bool stepCode = false;
-  bool silent = false;
-  final stdout = StringBuffer();
+  Debug errDebug;
+  Debug traceDebug;
+  Debug stdout;
 
-  VM() {
+  VM({bool silent}) {
+    errDebug = Debug(silent);
+    traceDebug = Debug(silent);
+    stdout = Debug(silent);
     _reset();
     for (var k = 0; k < frames.length; k++) {
       frames[k] = CallFrame();
@@ -132,8 +99,7 @@ class VM {
     }
     final err = RuntimeError(token, msg, link: link);
     errors.add(err);
-    // Dump error if needed
-    if (!silent) err.dump();
+    err.dump(errDebug);
     return err;
   }
 
@@ -172,6 +138,8 @@ class VM {
     hasOp = false;
     tokenValues.clear();
     stdout.clear();
+    errDebug.clear();
+    traceDebug.clear();
     // Reset flags
     traceValues = false;
     stepCode = false;
@@ -503,6 +471,14 @@ class VM {
     return frameCount == 0;
   }
 
+  InterpreterResult run() {
+    InterpreterResult res;
+    do {
+      res = stepBatch();
+    } while (res == null);
+    return res;
+  }
+
   InterpreterResult stepBatch({int batchCount = BATCH_COUNT}) {
     // Setup
     if (frameCount == 0) return withError('No call frame');
@@ -532,15 +508,15 @@ class VM {
       line = frameLine;
 
       // Trace execution if needed
-      if (DEBUG_TRACE_EXECUTION) {
-        stdwrite('          ');
+      if (traceExecution) {
+        traceDebug.stdwrite('          ');
         for (var k = 0; k < stackTop; k++) {
-          stdwrite('[ ');
-          printValue(stack[k]);
-          stdwrite(' ]');
+          traceDebug.stdwrite('[ ');
+          traceDebug.printValue(stack[k]);
+          traceDebug.stdwrite(' ]');
         }
-        stdwrite('\n');
-        disassembleInstruction(
+        traceDebug.stdwrite('\n');
+        traceDebug.disassembleInstruction(
             prevLine, frame.closure.function.chunk, frame.ip);
       }
 
@@ -827,8 +803,7 @@ class VM {
         case OpCode.PRINT:
           {
             final val = valueToString(pop());
-            if (!silent) print(val);
-            stdout.writeln(val);
+            stdout.stdwriteln(val);
             break;
           }
 

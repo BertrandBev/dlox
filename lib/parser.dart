@@ -1,25 +1,28 @@
+import 'package:dlox/debug.dart';
 import 'package:dlox/scanner.dart';
 
 import 'error.dart';
 
 class Parser {
   final List<Token> tokens;
-  final bool silent;
   final List<CompilerError> errors = [];
   Token current;
   Token previous;
   Token secondPrevious;
   int currentIdx = 0;
   bool panicMode = false;
+  Debug debug;
 
-  Parser(this.tokens, {this.silent = false});
+  Parser(this.tokens, {bool silent = false}) {
+    debug = Debug(silent);
+  }
 
   void errorAt(Token token, String message) {
     if (panicMode) return;
     panicMode = true;
     final error = CompilerError(token, message);
     errors.add(error);
-    if (!silent) error.dump();
+    error.dump(debug);
   }
 
   void error(String message) {

@@ -9,20 +9,20 @@ class LangError {
 
   LangError(this.type, this.token, this.msg);
 
-  void dump() {
+  void dump(Debug debug) {
     if (token == null) {
-      stdwriteln('$type error: $msg');
+      debug.stdwriteln('$type error: $msg');
       return;
     }
-    stdwrite('[${token.loc}] $type error');
+    debug.stdwrite('[${token.loc}] $type error');
     if (token.type == TokenType.EOF) {
-      stdwrite(' at end');
+      debug.stdwrite(' at end');
     } else if (token.type == TokenType.ERROR) {
       // Nothing.
     } else {
-      stdwrite(' at \'${token.str}\'');
+      debug.stdwrite(' at \'${token.str}\'');
     }
-    stdwrite(': $msg\n');
+    debug.stdwrite(': $msg\n');
   }
 }
 

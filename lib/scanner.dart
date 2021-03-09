@@ -209,6 +209,7 @@ class Token {
 }
 
 class Scanner {
+  final debug = Debug(false);
   String source;
   int start = 0;
   int current = 0;
@@ -229,12 +230,13 @@ class Scanner {
       var line = -1;
       tokens.forEach((token) {
         if (token.loc.i != line) {
-          stdwrite(sprintf('%4d ', [token.loc.i]));
+          scanner.debug.stdwrite(sprintf('%4d ', [token.loc.i]));
           line = token.loc.i;
         } else {
-          stdwrite('   | ');
+          scanner.debug.stdwrite('   | ');
         }
-        stdwrite(sprintf("%2d '%s'\n", [token.type.index, token.str]));
+        scanner.debug
+            .stdwrite(sprintf("%2d '%s'\n", [token.type.index, token.str]));
       });
     }
     return tokens;

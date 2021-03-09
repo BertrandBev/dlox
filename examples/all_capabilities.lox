@@ -1,0 +1,20 @@
+fun fib(n) {
+  if (n < 2) return n;
+  return fib(n - 2) + fib(n - 1);
+}
+
+class superclass {
+    fun print(n) {
+        print("a superclass");
+        print n;
+    }
+}
+
+class class < superclass {
+    fun init(val) {
+        this.val = val;
+        super.print(val);
+        this.list = [1, 2, 3, "go"];
+        this.map = {"a": 1, "b": 2}
+    }
+}

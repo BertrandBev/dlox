@@ -11,7 +11,7 @@ void main() async {
 }
 
 class Test {
-  final syncVM = SyncVM(silent: true);
+  final vm = VM(silent: true);
 
   static void run() {
     Test._();
@@ -91,15 +91,15 @@ class Test {
     if (errList.isNotEmpty) return true;
 
     // Run test
-    syncVM.vm.stdout.clear();
-    syncVM.setFunctionParams(result, FunctionParams());
-    syncVM.run();
+    vm.stdout.clear();
+    vm.setFunction(result, FunctionParams());
+    vm.run();
 
     // Extract test reqs
     var rtnExp = RegExp(r'// expect: (.+)');
     final rtnMatches = rtnExp.allMatches(source);
     final stdoutRef = rtnMatches.map((e) => e.group(1)).toList();
-    final stdout = syncVM.vm.stdout
+    final stdout = vm.stdout
         .toString()
         .trim()
         .split('\n')

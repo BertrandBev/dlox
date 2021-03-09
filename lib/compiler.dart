@@ -71,8 +71,9 @@ class CompilerResult {
   final ObjFunction function;
   final Tracer tracer;
   final List<CompilerError> errors;
+  final Debug debug;
 
-  CompilerResult(this.function, this.tracer, this.errors);
+  CompilerResult(this.function, this.tracer, this.errors, this.debug);
 }
 
 class Compiler {
@@ -94,7 +95,7 @@ class Compiler {
       parser = enclosing.parser;
       tracer = enclosing.tracer;
       currentClass = enclosing.currentClass;
-      scopeDepth = this.enclosing.scopeDepth + 1;
+      scopeDepth = enclosing.scopeDepth + 1;
     } else {
       assert(parser != null);
       tracer = Tracer();
@@ -119,13 +120,18 @@ class Compiler {
     }
     final function = compiler.endCompiler();
     parser.errors.addAll(compiler.tracer.finalize(false));
-    return CompilerResult(function, compiler.tracer, parser.errors);
+    return CompilerResult(
+      function,
+      compiler.tracer,
+      parser.errors,
+      parser.debug,
+    );
   }
 
   ObjFunction endCompiler() {
     emitReturn();
-    if (DEBUG_PRINT_CODE && parser.errors.isEmpty) {
-      disassembleChunk(currentChunk, function.name ?? '<script>');
+    if (parser.errors.isEmpty) {
+      parser.debug.disassembleChunk(currentChunk, function.name ?? '<script>');
     }
     return function;
   }

@@ -1,4 +1,3 @@
-import 'dart:collection';
 import 'dart:math';
 
 import 'package:dlox/chunk.dart';
@@ -8,7 +7,6 @@ import 'package:dlox/table.dart';
 import 'package:dlox/value.dart';
 
 import 'common.dart';
-import 'debug.dart';
 import 'native.dart';
 import 'native_classes.dart';
 
@@ -234,7 +232,7 @@ String functionToString(ObjFunction function) {
 }
 
 void printObject(Object value) {
-  stdwrite(objectToString(value));
+  print(objectToString(value));
 }
 
 String objectToString(Object value, {int maxChars = 100}) {

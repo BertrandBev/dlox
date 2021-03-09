@@ -5,14 +5,18 @@ import 'package:dlox/vm.dart';
 import 'compiler.dart';
 import 'debug.dart';
 
+final debug = Debug(false);
+
 void repl() {
-  final vm = SyncVM();
+  final vm = VM();
   while (true) {
-    stdwrite('> ');
+    debug.stdwrite('> ');
     final line = stdin.readLineSync(encoding: Encoding.getByName('utf-8'));
     if (line == null) break;
-    final tokens = Scanner.scan(line + '\n', );
-    vm.compile(tokens);
+    final tokens = Scanner.scan(line + '\n');
+    final compilerResult = Compiler.compile(tokens);
+    if (compilerResult.errors.isNotEmpty) continue;
+    vm.setFunction(compilerResult, FunctionParams());
     vm.run();
   }
 }
@@ -22,15 +26,16 @@ String readFile(String path) {
 }
 
 void runFile(String path) {
-  CompilerResult result;
-  final vm = SyncVM();
+  final vm = VM();
   final source = readFile(path);
-  final tokens = Scanner.scan(source, );
-  result = vm.compile(tokens);
-  if (result.errors.isNotEmpty) exit(65);
-  vm.setFunctionParams(result, FunctionParams());
-  final res = vm.run();
-  if (res.errors.isNotEmpty) exit(70);
+  final tokens = Scanner.scan(
+    source,
+  );
+  final compilerResult = Compiler.compile(tokens);
+  if (compilerResult.errors.isNotEmpty) exit(65);
+  vm.setFunction(compilerResult, FunctionParams());
+  final intepreterResult = vm.run();
+  if (intepreterResult.errors.isNotEmpty) exit(70);
 }
 
 void main(List<String> args) async {
@@ -42,7 +47,7 @@ void main(List<String> args) async {
   } else if (args.length == 1) {
     runFile(args[0]);
   } else {
-    stdwriteln('Usage: clox [path]');
+    debug.stdwriteln('Usage: clox [path]');
     exit(64);
   }
 }
