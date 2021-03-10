@@ -1,4 +1,5 @@
 import 'package:demo/lox_mode.dart';
+import 'package:demo/runtime.dart';
 import 'package:dlox/compiler.dart';
 import 'package:dlox/error.dart';
 import 'package:dlox/vm.dart';
@@ -9,10 +10,12 @@ import 'package:code_text_field/code_field.dart';
 import 'package:flutter_highlight/themes/monokai-sublime.dart'
     show monokaiSublimeTheme;
 
-class CodeEditor extends StatefulWidget {
-  final Function onCodeChange;
+import 'constants.dart';
 
-  CodeEditor({Key key, this.onCodeChange}) : super(key: key);
+class CodeEditor extends StatefulWidget {
+  final Runtime runtime;
+
+  CodeEditor({Key key, this.runtime}) : super(key: key);
 
   @override
   CodeEditorState createState() => CodeEditorState();
@@ -29,15 +32,16 @@ class CodeEditorState extends State<CodeEditor> {
     super.initState();
     // Instantiate the CodeController
     _codeController = CodeController(
+      text: widget.runtime.source,
       language: lox,
       theme: monokaiSublimeTheme,
     );
-    _codeController.addListener(_onCodeChange);
+    _codeController.addListener(_onSourceChange);
   }
 
   @override
   void dispose() {
-    _codeController.removeListener(_onCodeChange);
+    _codeController.removeListener(_onSourceChange);
     _codeController.dispose();
     super.dispose();
   }
@@ -46,8 +50,8 @@ class CodeEditorState extends State<CodeEditor> {
     _codeController.text = source;
   }
 
-  void _onCodeChange() {
-    if (widget.onCodeChange != null) widget.onCodeChange();
+  void _onSourceChange() {
+    widget.runtime.setSource(_codeController.text);
   }
 
   void _setErrors(List<LangError> errors) {
@@ -81,14 +85,13 @@ class CodeEditorState extends State<CodeEditor> {
       return TextSpan(
         text: "❌",
         style: style.copyWith(color: Colors.red),
-        recognizer: TapGestureRecognizer()
-          ..onTap = () => print('OnTap'),
+        recognizer: TapGestureRecognizer()..onTap = () => print('OnTap'),
       );
     if (interpreterResult?.lastLine == line - 1)
       return TextSpan(
         text: ">",
         style: style.copyWith(
-          color: Colors.green,
+          color: ColorTheme.functions,
           fontWeight: FontWeight.bold,
         ),
       );

@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:demo/constants.dart';
 import 'package:demo/runtime_toolbar.dart';
-import 'package:demo/toggle_button.dart';
+import 'package:demo/widgets/toggle_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_icons/flutter_icons.dart';
@@ -96,6 +96,7 @@ class _EditorToolbarState extends State<EditorToolbar> {
   @override
   Widget build(BuildContext context) {
     final github = IconButton(
+      padding: EdgeInsets.only(left: 8.0),
       icon: Icon(FontAwesome5Brands.github, color: Colors.white),
       onPressed: () =>
           _launchInBrowser("https://github.com/BertrandBev/code_field"),

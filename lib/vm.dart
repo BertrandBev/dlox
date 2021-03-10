@@ -698,7 +698,8 @@ class VM {
               res.addAll(b);
               push(res);
             } else if ((a is String) || (b is String)) {
-              push(valueToString(a) + valueToString(b));
+              push(valueToString(a, quoteEmpty: false) +
+                  valueToString(b, quoteEmpty: false));
             } else {
               return runtimeError(
                   'Operands must numbers, strings, lists or maps');

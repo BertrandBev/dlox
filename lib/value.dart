@@ -48,7 +48,11 @@ String mapToString(Map map, {int maxChars = 100}) {
   return buf.toString();
 }
 
-String valueToString(Object value, {int maxChars = 100}) {
+String valueToString(
+  Object value, {
+  int maxChars = 100,
+  bool quoteEmpty = true,
+}) {
   if (value is bool) {
     return value ? 'true' : 'false';
   } else if (value == Nil) {
@@ -59,7 +63,7 @@ String valueToString(Object value, {int maxChars = 100}) {
     } else if (value.isNaN) return 'NaN';
     return sprintf('%g', [value]);
   } else if (value is String) {
-    return value.trim().isEmpty ? '\'$value\'' : value;
+    return value.trim().isEmpty && quoteEmpty ? '\'$value\'' : value;
   } else if (value is List) {
     return listToString(value, maxChars: maxChars);
   } else if (value is Map) {

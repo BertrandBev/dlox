@@ -1,9 +1,8 @@
 import 'package:demo/editor_toolbar.dart';
-import 'package:demo/monitor.dart';
+import 'package:demo/widgets/monitor.dart';
 import 'package:demo/runtime.dart';
 import 'package:demo/runtime_toolbar.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_icons/flutter_icons.dart';
 import 'package:provider/provider.dart';
 
@@ -17,19 +16,18 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      debugShowCheckedModeBanner: false,
+      title: 'dlox',
       theme: ThemeData(
         primarySwatch: Colors.blueGrey,
       ),
-      home: HomePage(title: 'Flutter Demo Home Page'),
+      home: HomePage(),
     );
   }
 }
 
 class HomePage extends StatefulWidget {
-  HomePage({Key key, this.title}) : super(key: key);
-
-  final String title;
+  HomePage({Key key}) : super(key: key);
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -47,7 +45,6 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     runtime = Runtime(
-      getSource: () => editorKey.currentState?.source,
       onCompilerResult: (res) {
         editorKey.currentState?.setCompilerResult(res);
       },
@@ -72,10 +69,9 @@ class _HomePageState extends State<HomePage> {
     layout.setScreenSize(queryData.size);
 
     final codeEditor = CodeEditor(
-        key: editorKey,
-        onCodeChange: () {
-          runtime.codeChanged();
-        });
+      key: editorKey,
+      runtime: runtime,
+    );
 
     final stdoutMonitor = Monitor(
       key: stdoutKey,

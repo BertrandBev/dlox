@@ -9,7 +9,7 @@ import 'package:flutter/foundation.dart';
 
 class Runtime extends ChangeNotifier {
   // State hooks
-  final String Function() getSource;
+  String source;
   final Function(CompilerResult) onCompilerResult;
   final Function(InterpreterResult) onInterpreterResult;
 
@@ -35,7 +35,6 @@ class Runtime extends ChangeNotifier {
   final compilerOut = <String>[];
 
   Runtime({
-    this.getSource,
     this.onCompilerResult,
     this.onInterpreterResult,
   }) {
@@ -77,7 +76,8 @@ class Runtime extends ChangeNotifier {
     super.dispose();
   }
 
-  void codeChanged() {
+  void setSource(String source) {
+    this.source = source;
     if (compileTimer != null) compileTimer.cancel();
     compileTimer = Timer(Duration(milliseconds: 500), () {
       compileTimer = null;
@@ -90,9 +90,15 @@ class Runtime extends ChangeNotifier {
   }
 
   void compile() {
-    final source = getSource();
     if (source == null || (compiledSource == source && compilerResult != null))
       return;
+    // Clear interpeter output
+    interpreterResult = null;
+    onInterpreterResult(interpreterResult);
+    // Clear monitors
+    compilerOut.clear();
+    clearOutput();
+    // Compile
     final tokens = Scanner.scan(source);
     compilerResult = Compiler.compile(
       tokens,
@@ -100,9 +106,6 @@ class Runtime extends ChangeNotifier {
       traceBytecode: true,
     );
     compiledSource = source;
-    // Clear monitors
-    compilerOut.clear();
-    clearOutput();
     // Populate result
     final str = compilerResult.debug.buf.toString();
     _populateBuffer(compilerOut, str);

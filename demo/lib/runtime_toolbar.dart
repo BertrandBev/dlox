@@ -1,8 +1,8 @@
 import 'package:demo/constants.dart';
-import 'package:demo/flushbar.dart';
-import 'package:demo/progress_button.dart';
+import 'package:demo/widgets/flushbar.dart';
+import 'package:demo/widgets/progress_button.dart';
 import 'package:demo/runtime.dart';
-import 'package:demo/toggle_button.dart';
+import 'package:demo/widgets/toggle_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_icons/flutter_icons.dart';
 import 'package:provider/provider.dart';
