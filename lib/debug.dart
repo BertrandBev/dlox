@@ -43,8 +43,7 @@ class Debug {
     var prevLine = -1;
     for (var offset = 0; offset < chunk.code.length;) {
       offset = disassembleInstruction(prevLine, chunk, offset);
-      final prevLoc = offset > 0 ? chunk.trace[offset - 1].token.loc : null;
-      prevLine = prevLoc.i;
+      prevLine = offset > 0 ? chunk.lines[offset - 1] : null;
     }
   }
 
@@ -92,13 +91,13 @@ class Debug {
 
   int disassembleInstruction(int prevLine, Chunk chunk, int offset) {
     stdwrite(sprintf('%04d ', [offset]));
-    final loc = chunk.trace[offset].token.loc;
+    final i = chunk.lines[offset];
     // stdwrite("${chunk.trace[offset].token.info} "); // temp
     // final prevLoc = offset > 0 ? chunk.trace[offset - 1].token.loc : null;
-    if (offset > 0 && loc.i == prevLine) {
+    if (offset > 0 && i == prevLine) {
       stdwrite('   | ');
     } else {
-      stdwrite(sprintf('%4d ', [loc.i]));
+      stdwrite(sprintf('%4d ', [i]));
     }
 
     final instruction = chunk.code[offset];
@@ -115,8 +114,6 @@ class Debug {
         return simpleInstruction('OP_POP', offset);
       case OpCode.GET_LOCAL:
         return byteInstruction('OP_GET_LOCAL', chunk, offset);
-      case OpCode.TRACER_DEFINE_LOCAL:
-        return byteInstruction('TRACER_DEFINE_LOCAL', chunk, offset);
       case OpCode.SET_LOCAL:
         return byteInstruction('OP_SET_LOCAL', chunk, offset);
       case OpCode.GET_GLOBAL:

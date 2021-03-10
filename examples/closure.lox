@@ -1,7 +1,7 @@
 var f;
 
 class Foo {
-  method(param) {
+  fun method(param) {
     fun f_() {
       print param;
     }

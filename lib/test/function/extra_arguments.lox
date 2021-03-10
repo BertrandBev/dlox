@@ -3,4 +3,4 @@ fun f(a, b) {
   print b;
 }
 
-f(1, 2, 3, 4); // Error at 'f': Expected 2 arguments.
+f(1, 2, 3, 4); // Runtime error: Expected 2 arguments but got 4.

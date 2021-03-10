@@ -30,7 +30,6 @@ class InterpreterResult {
   final int lastLine;
   final int stepCount;
   final Object returnValue;
-  final Map<Token, Object> tokenValues;
 
   bool get done {
     return errors.isNotEmpty || returnValue != null;
@@ -38,7 +37,6 @@ class InterpreterResult {
 
   InterpreterResult(
     List<LangError> errors,
-    this.tokenValues,
     this.lastLine,
     this.stepCount,
     this.returnValue,
@@ -70,10 +68,8 @@ class VM {
   int line = -1;
   // int skipLine = -1;
   bool hasOp = false;
-  final Map<Token, Object> tokenValues = {};
   // Debug API
   bool traceExecution = false;
-  bool traceValues = false;
   bool stepCode = false;
   Debug errDebug;
   Debug traceDebug;
@@ -89,25 +85,22 @@ class VM {
     }
   }
 
-  RuntimeError addError(String msg, {RuntimeError link}) {
-    Token token;
-    if (frameCount > 0) {
-      final frame = frames[frameCount - 1];
-      final trace = frame.chunk.trace;
-      if (trace.length > frame.ip) token = trace[frame.ip].token;
-    }
-    final err = RuntimeError(token, msg, link: link);
+  RuntimeError addError(String msg, {RuntimeError link, int line}) {
+    // int line = -1;
+    // if (frameCount > 0) {
+    //   final frame = frames[frameCount - 1];
+    //   final lines = frame.chunk.lines;
+    //   if (frame.ip < lines.length) line = lines[frame.ip];
+    // }
+    final err = RuntimeError(line ?? this.line, msg, link: link);
     errors.add(err);
     err.dump(errDebug);
     return err;
   }
 
   InterpreterResult getResult(int line, {Object returnValue}) {
-    final tokenValues =
-        traceValues ? this.tokenValues : <Token, Object>{}; // valueSnapshot();
     return InterpreterResult(
       errors,
-      tokenValues,
       line,
       stepCount,
       returnValue,
@@ -135,12 +128,10 @@ class VM {
     stepCount = 0;
     line = -1;
     hasOp = false;
-    tokenValues.clear();
     stdout.clear();
     errDebug.clear();
     traceDebug.clear();
     // Reset flags
-    traceValues = false;
     stepCode = false;
     // Define natives
     defineNatives();
@@ -256,7 +247,7 @@ class VM {
   bool invokeFromClass(ObjClass klass, String name, int argCount) {
     final method = klass.methods.getVal(name);
     if (method == null) {
-      runtimeError("Undefined property '%s'.", [name]);
+      runtimeError("Undefined property '%s'", [name]);
       return false;
     }
     return call(method as ObjClosure, argCount);
@@ -357,7 +348,7 @@ class VM {
   bool bindMethod(ObjClass klass, String name) {
     final method = klass.methods.getVal(name);
     if (method == null) {
-      runtimeError("Undefined property '%s'.", [name]);
+      runtimeError("Undefined property '%s'", [name]);
       return false;
     }
     final bound = ObjBoundMethod(peek(0), method as ObjClosure);
@@ -454,18 +445,6 @@ class VM {
     return idx;
   }
 
-  void vmSetValue(CallFrame frame, Object value, {int ip}) {
-    ip ??= frame.ip - 1;
-    final function = frame.closure.function;
-    final traceEvent = function.chunk.trace[ip];
-    final eventType = traceEvent?.type;
-    if (eventType != TraceEventType.NONE) {
-      // Clone value deeply if needed
-      // Optimisation: clone on mutation! (more efficient)
-      tokenValues[traceEvent.token] = valueCloneDeep(value);
-    }
-  }
-
   bool get done {
     return frameCount == 0;
   }
@@ -548,7 +527,6 @@ class VM {
           {
             final slot = readByte(frame);
             push(stack[frame.slotsIdx + slot]);
-            if (traceValues) vmSetValue(frame, peek(0));
             break;
           }
 
@@ -556,16 +534,6 @@ class VM {
           {
             final slot = readByte(frame);
             stack[frame.slotsIdx + slot] = peek(0);
-            if (traceValues) vmSetValue(frame, peek(0));
-            break;
-          }
-
-        case OpCode.TRACER_DEFINE_LOCAL:
-          {
-            // Dummy instruction for tracing purposes
-            final slot = readByte(frame);
-            final value = stack[frame.slotsIdx + slot];
-            if (traceValues) vmSetValue(frame, value);
             break;
           }
 
@@ -574,10 +542,9 @@ class VM {
             final name = readString(frame);
             final value = globals.getVal(name);
             if (value == null) {
-              return runtimeError("Undefined variable '%s'.", [name]);
+              return runtimeError("Undefined variable '%s'", [name]);
             }
             push(value);
-            if (traceValues) vmSetValue(frame, peek(0));
             break;
           }
 
@@ -585,7 +552,6 @@ class VM {
           {
             final name = readString(frame);
             globals.setVal(name, peek(0));
-            if (traceValues) vmSetValue(frame, peek(0));
             pop();
             break;
           }
@@ -595,9 +561,8 @@ class VM {
             final name = readString(frame);
             if (globals.setVal(name, peek(0))) {
               globals.delete(name); // [delete]
-              return runtimeError("Undefined variable '%s'.", [name]);
+              return runtimeError("Undefined variable '%s'", [name]);
             }
-            if (traceValues) vmSetValue(frame, peek(0));
             break;
           }
 
@@ -608,7 +573,6 @@ class VM {
             push(upvalue.location != null
                 ? stack[upvalue.location]
                 : upvalue.closed);
-            if (traceValues) vmSetValue(frame, peek(0));
             break;
           }
 
@@ -621,7 +585,6 @@ class VM {
             } else {
               upvalue.closed = peek(0);
             }
-            if (traceValues) vmSetValue(frame, peek(0));
             break;
           }
 
@@ -1070,9 +1033,6 @@ class VM {
               stack[frame.slotsIdx + keyIdx] = idx;
               stack[frame.slotsIdx + valIdx] = item;
             }
-            // Emit events
-            vmSetValue(frame, stack[frame.slotsIdx + keyIdx], ip: keyOpIdx);
-            vmSetValue(frame, stack[frame.slotsIdx + valIdx], ip: valOpIdx);
             // Increment index
             stack[frame.slotsIdx + idxIdx] = idx + 1;
             push(true);
@@ -1083,56 +1043,16 @@ class VM {
     return null;
   }
 
-  Map<Token, Object> valueSnapshot() {
-    final tokenValues = <Token, Object>{};
-    final fromFrame = max(0, frameCount - 1);
-    final hasFirstFrame = frames.first.closure != null;
-    for (var f = fromFrame; f >= 0 && hasFirstFrame; f--) {
-      final frame = frames[f];
-      final tracer = compilerResult.tracer;
-      final upvalues = frame.closure.upvalues;
-      var localIdx = 1;
-      for (var i = 0; i < frame.ip; i++) {
-        final trace = frame.chunk.trace[i];
-        final token = trace.token;
-        final root = tracer.getVariableRoot(token);
-        final op = i > 0 ? OpCode.values[frame.chunk.code[i - 1]] : null;
-        final arg = frame.chunk.code[i];
-        if (trace.type == TraceEventType.VARIABLE_GET) {
-          // Treat upvalue differently
-          if (op == OpCode.GET_UPVALUE && upvalues[arg].location == null) {
-            tokenValues[root] = upvalues[arg].closed;
-          }
-          // activeTokens.add(token);
-          tokenValues[token] = tokenValues[root];
-        } else if (trace.type == TraceEventType.VARIABLE_SET) {
-          // Set token value based on variable type
-          if (op == OpCode.SET_UPVALUE && upvalues[arg].location == null) {
-            tokenValues[root] = upvalues[arg].closed;
-          } else if (op == OpCode.DEFINE_GLOBAL) {
-            tokenValues[root] = globals.getVal(root.str);
-          } else if (op == OpCode.TRACER_DEFINE_LOCAL) {
-            tokenValues[root] = stack[frame.slotsIdx + localIdx++];
-          }
-          // activeTokens.add(token);
-          tokenValues[token] = tokenValues[root];
-        }
-      }
-    }
-    return tokenValues;
-  }
-
   InterpreterResult runtimeError(String format, [List<Object> args]) {
     var error = addError(sprintf(format, args ?? []));
     for (var i = frameCount - 2; i >= 0; i--) {
       final frame = frames[i];
       final function = frame.closure.function;
       // frame.ip is sitting on the next instruction
-      final traceEvent = function.chunk.trace[frame.ip - 1];
-      final loc = traceEvent.token.loc;
-      final fun = function.name == null ? 'script' : '${function.name}()';
-      final msg = 'ERROR [line ${loc.i}] in $fun';
-      error = addError(msg, link: error);
+      final line = function.chunk.lines[frame.ip - 1];
+      final fun = function.name == null ? '<script>' : '<${function.name}>';
+      final msg = 'during $fun execution';
+      error = addError(msg, line: line, link: error);
     }
     return result;
   }

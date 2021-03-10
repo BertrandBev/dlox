@@ -68,11 +68,10 @@ class ClassCompiler {
 
 class CompilerResult {
   final ObjFunction function;
-  final Tracer tracer;
   final List<CompilerError> errors;
   final Debug debug;
 
-  CompilerResult(this.function, this.tracer, this.errors, this.debug);
+  CompilerResult(this.function, this.errors, this.debug);
 }
 
 class Compiler {
@@ -86,7 +85,6 @@ class Compiler {
   int scopeDepth = 0;
   // Degug tracer
   bool traceBytecode;
-  Tracer tracer;
 
   Compiler._(
     this.type, {
@@ -98,13 +96,11 @@ class Compiler {
     if (enclosing != null) {
       assert(parser == null);
       parser = enclosing.parser;
-      tracer = enclosing.tracer;
       currentClass = enclosing.currentClass;
       scopeDepth = enclosing.scopeDepth + 1;
       traceBytecode = enclosing.traceBytecode;
     } else {
       assert(parser != null);
-      tracer = Tracer();
     }
 
     if (type != FunctionType.SCRIPT) {
@@ -130,10 +126,8 @@ class Compiler {
       compiler.declaration();
     }
     final function = compiler.endCompiler();
-    parser.errors.addAll(compiler.tracer.finalize(false));
     return CompilerResult(
       function,
-      compiler.tracer,
       parser.errors,
       parser.debug,
     );
@@ -152,23 +146,16 @@ class Compiler {
   }
 
   void consume(TokenType type, String message) {
-    tracer.onToken(parser.current, scopeDepth);
     parser.consume(type, message);
   }
 
   bool match(TokenType type) {
     final res = parser.match(type);
-    if (res) tracer.onToken(parser.current, scopeDepth);
     return res;
   }
 
   bool matchPair(TokenType first, TokenType second) {
     final res = parser.matchPair(first, second);
-    if (res) {
-      // Assumes that a pair of tokens never mutates the depth
-      tracer.onToken(parser.previous, scopeDepth);
-      tracer.onToken(parser.current, scopeDepth);
-    }
     return res;
   }
 
@@ -345,20 +332,8 @@ class Compiler {
     final isLocal = scopeDepth > 0;
     if (isLocal) {
       markLocalVariableInitialized();
-      final slotIdx = locals.length - 1 - peekDist;
-      emitBytes(OpCode.TRACER_DEFINE_LOCAL.index, slotIdx);
     } else {
       emitBytes(OpCode.DEFINE_GLOBAL.index, global);
-    }
-    if (token != null) {
-      // Variable definition
-      tracer.defineVariable(token, isLocal);
-      // if (isLocal)
-      // TODO: check if needed
-      currentChunk.setTraceEvent(TraceEvent(
-        token,
-        type: TraceEventType.VARIABLE_SET,
-      ));
     }
   }
 
@@ -433,10 +408,8 @@ class Compiler {
   }
 
   void call(bool canAssign) {
-    final token = parser.secondPrevious;
     var argCount = argumentList();
     emitBytes(OpCode.CALL.index, argCount);
-    tracer.functionCall(token, argCount);
   }
 
   void listIndex(bool canAssign) {
@@ -570,22 +543,16 @@ class Compiler {
   void getOrSetVariable(Token name, bool canAssign) {
     OpCode getOp, setOp;
     var arg = resolveLocal(name);
-    Token rootToken;
-    var isLocal = true;
     if (arg != -1) {
       getOp = OpCode.GET_LOCAL;
       setOp = OpCode.SET_LOCAL;
-      rootToken = locals[arg].name;
     } else if ((arg = resolveUpvalue(name)) != -1) {
       getOp = OpCode.GET_UPVALUE;
       setOp = OpCode.SET_UPVALUE;
-      rootToken = upvalues[arg].name;
     } else {
       arg = identifierConstant(name);
       getOp = OpCode.GET_GLOBAL;
       setOp = OpCode.SET_GLOBAL;
-      rootToken = name;
-      isLocal = false;
     }
 
     // Special mathematical assignment
@@ -606,23 +573,13 @@ class Compiler {
       }
     }
 
-    TraceEventType eventType;
     if (canAssign && (assignOp != null || match(TokenType.EQUAL))) {
       if (assignOp != null) emitBytes(getOp.index, arg);
       expression();
       if (assignOp != null) emitOp(assignOp);
       emitBytes(setOp.index, arg);
-      eventType = TraceEventType.VARIABLE_SET;
     } else {
       emitBytes(getOp.index, arg);
-      eventType = TraceEventType.VARIABLE_GET;
-    }
-    // Trace tokens
-    currentChunk.setTraceEvent(TraceEvent(name, type: eventType));
-    if (isLocal) {
-      tracer.linkLocal(rootToken, name);
-    } else {
-      tracer.linkGlobal(rootToken.str, name);
     }
   }
 
@@ -820,9 +777,8 @@ class Compiler {
     if (identifier.str == 'init') {
       type = FunctionType.INITIALIZER;
     }
-    final fun = functionBlock(type);
+    functionBlock(type);
     emitBytes(OpCode.METHOD.index, constant);
-    tracer.defineFunction(identifier, fun.arity);
   }
 
   void classDeclaration() {
@@ -874,9 +830,9 @@ class Compiler {
     var global = parseVariable('Expect function name');
     final token = parser.previous;
     markLocalVariableInitialized();
-    final fun = functionBlock(FunctionType.FUNCTION);
+    functionBlock(FunctionType.FUNCTION);
+
     defineVariable(global, token: token);
-    tracer.defineFunction(token, fun.arity);
   }
 
   void varDeclaration() {

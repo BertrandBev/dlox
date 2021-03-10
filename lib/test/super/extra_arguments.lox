@@ -7,7 +7,7 @@ class Base {
 class Derived < Base {
   fun foo() {
     print "Derived.foo()"; // expect: Derived.foo()
-    super.foo("a", "b", "c", "d"); // expect runtime error: Expected 2 arguments but got 4.
+    super.foo("a", "b", "c", "d"); // Runtime error: Expected 2 arguments but got 4.
   }
 }
 

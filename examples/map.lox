@@ -1,6 +1,0 @@
-var a = { "c": 3 + 5, "d": "test" + "_val" };
-print a.length();
-print a.has("c");
-print a.has("e");
-print a.keys();
-print a.values();

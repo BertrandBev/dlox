@@ -8,5 +8,6 @@ build/
 # Directory created by dartdoc
 doc/api/
 reference/
+examples/
 *.out
 *.exe

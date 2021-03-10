@@ -1,7 +1,7 @@
 fun foo() {}
 {
   var a = 1;
-  foo( // Error at 'foo': Expected 0 arguments
+  foo(
      a, // 1
      a, // 2
      a, // 3

@@ -1,3 +1,3 @@
 fun f(a, b) {}
 
-f(1); // Error at 'f': Expected 2 arguments
+f(1); // Runtime error: Expected 2 arguments but got 1.

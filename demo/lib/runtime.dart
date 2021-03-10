@@ -27,7 +27,7 @@ class Runtime extends ChangeNotifier {
 
   // Performance tracking
   int timeStartedMs;
-  int averageIps = 0;
+  double averageIps = 0;
 
   // Buffers variables
   final stdout = <String>[];
@@ -157,7 +157,7 @@ class Runtime extends ChangeNotifier {
       );
       // Update Ips counter
       final dt = DateTime.now().millisecondsSinceEpoch - timeStartedMs;
-      averageIps = vm.stepCount ~/ max(1, dt ~/ 1000);
+      averageIps = vm.stepCount / max(dt, 1) * 1000;
       _onInterpreterResult();
       await Future.delayed(Duration(seconds: 0));
     }

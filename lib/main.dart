@@ -37,9 +37,9 @@ void runFile(String path) {
 }
 
 void main(List<String> args) async {
-  // final path =
-  //     '/Users/bbevillard/Documents/Bev/Code/Flutter/paradigm/lib/lang/examples/';
-  // args = [path + 'easy.txt'];
+  final path =
+      '/Users/bbevillard/Documents/Bev/Code/Dart/dlox/examples/';
+  args = [path + 'closure.lox'];
   if (args.isEmpty) {
     repl();
   } else if (args.length == 1) {

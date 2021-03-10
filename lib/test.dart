@@ -66,22 +66,21 @@ class Test {
       lineNumber.add(line);
     }
 
-    // Extract static error reqs
-    final errExp = RegExp(r'// Error at (.+):(.+)');
-    final errMatches = errExp.allMatches(source);
-    final errRef = errMatches.map((e) {
+    // Compile test
+    final tokens = Scanner.scan(source);
+    final compilerResult = Compiler.compile(tokens, silent: true);
+
+    // Compiler error
+    var errExp = RegExp(r'// Error at (.+):(.+)');
+    var errMatches = errExp.allMatches(source);
+    var errRef = errMatches.map((e) {
       final line = lineNumber[e.start];
       var msg = e.group(2).trim();
       if (msg.endsWith('.')) msg = msg.substring(0, msg.length - 1);
       return '$line:$msg';
     }).toSet();
-
-    // Compile test
-    CompilerResult result;
-    final tokens = Scanner.scan(source);
-    result = Compiler.compile(tokens, silent: true);
-    final errList =
-        result.errors.map((e) => '${e.token.loc.i}:${e.msg}').toSet();
+    var errList =
+        compilerResult.errors.map((e) => '${e.token.loc.i}:${e.msg}').toSet();
     if (!setEq(errRef, errList)) {
       print('$tab Compile error mismatch');
       print('$tab -> expected: $errRef');
@@ -92,14 +91,35 @@ class Test {
 
     // Run test
     vm.stdout.clear();
-    vm.setFunction(result, FunctionParams());
-    vm.run();
+    vm.setFunction(compilerResult, FunctionParams());
+    final intepreterResult = vm.run();
+
+    // Interpreter errors
+    errExp = RegExp(r'// Runtime error:(.+)');
+    errMatches = errExp.allMatches(source);
+    errRef = errMatches.map((e) {
+      final line = lineNumber[e.start];
+      var msg = e.group(1).trim();
+      if (msg.endsWith('.')) msg = msg.substring(0, msg.length - 1);
+      return '$line:$msg';
+    }).toSet();
+    errList = intepreterResult.errors
+        .map((e) => '${e.line}:${e.msg}')
+        // filter out stack traces
+        .where((el) => !el.contains(RegExp('during(.+)execution')))
+        .toSet();
+    if (!setEq(errRef, errList)) {
+      print('$tab Runtime error mismatch');
+      print('$tab -> expected: $errRef');
+      print('$tab -> got: $errList');
+      return false;
+    }
 
     // Extract test reqs
     var rtnExp = RegExp(r'// expect: (.+)');
     final rtnMatches = rtnExp.allMatches(source);
     final stdoutRef = rtnMatches.map((e) => e.group(1)).toList();
-    final stdout = vm.stdout
+    final stdout = vm.stdout.buf
         .toString()
         .trim()
         .split('\n')

@@ -1,4 +1,5 @@
 import 'package:demo/constants.dart';
+import 'package:demo/flushbar.dart';
 import 'package:demo/progress_button.dart';
 import 'package:demo/runtime.dart';
 import 'package:demo/toggle_button.dart';
@@ -66,11 +67,20 @@ class _RuntimeToolbarState extends State<RuntimeToolbar> {
       suffix = "k";
     }
     final ipsStr = ips.toStringAsFixed(suffix.isNotEmpty ? 2 : 0);
-    return Row(children: [
-      Text(
+    final text = InkWell(
+      child: Text(
         "$ipsStr$suffix ips",
         style: TextStyle(color: Colors.white, fontSize: 16.0),
       ),
+      onTap: () {
+        Flushbar.show(
+          context,
+          "Measures the average number of instructions per seconds",
+        );
+      },
+    );
+    return Row(children: [
+      text,
       SizedBox(width: 4.0),
       btn,
     ]);

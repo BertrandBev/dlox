@@ -4,4 +4,4 @@ var a = "1
 3
 ";
 
-err; // // expect runtime error: Undefined variable 'err'.
+err; // // Runtime error: Undefined variable 'err'.

@@ -1,1 +1,1 @@
-true + 123; // expect runtime error: Operands must be two numbers or two strings.
+true + 123; // Runtime error: Operands must numbers, strings, lists or maps.
