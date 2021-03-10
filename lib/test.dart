@@ -34,7 +34,7 @@ class Test {
 
   Future<bool> runAllDirs() async {
     // run tests
-    final dirList = await dirContents(Directory('./test'));
+    final dirList = await dirContents(Directory('./lib/test'));
     for (var k = 0; k < dirList.length; k++) {
       final dir = dirList[k];
       print('Running test group: ${basename(dir.path)}');
