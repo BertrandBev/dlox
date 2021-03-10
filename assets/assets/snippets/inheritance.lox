@@ -1,0 +1,35 @@
+// 'Abstract' vehicle class
+class Vehicle {
+    fun speakUp() {
+        var prefix = "Chugging along";
+        if (this.speed > 30) prefix = "Speeding around";
+        var buf = prefix + " at " + this.speed + " mph";
+        print buf + " on my " + this.wheels + " wheels!";
+    }
+
+    fun illegalSpeed() {
+        return 130;
+    }
+}
+
+// Inherits from superclass Vehicle
+class Tractor < Vehicle {
+    fun init(speed) {
+        this.speed = speed;
+        this.wheels = 4;
+    }
+}
+
+// Inherits from superclass Vehicle
+class Superbike < Vehicle {
+    fun init() {
+        this.speed = super.illegalSpeed();
+        this.wheels = 2;
+    }
+}
+
+var tractor = Tractor(25);
+tractor.speakUp();
+
+var superbike = Superbike();
+superbike.speakUp();

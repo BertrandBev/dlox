@@ -1,0 +1,14 @@
+// A slow but pretty recursive implementation
+fun fib(n) {
+  if (n <= 1) return n;
+  return fib(n - 2) + fib(n - 1);
+}
+
+// Print N first numbers
+var N = 6;
+var buf = "[";
+for (var k = 0; k < N; k += 1) {
+    buf += fib(k);
+    if (k < N - 1) buf += ", ";
+}
+print buf + "]";
