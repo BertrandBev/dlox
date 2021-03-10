@@ -1,0 +1,15 @@
+fun buildCounter() {
+    var count = 0;
+
+    fun increment() {
+        // Captures the enclosing scope's local variable
+        count += 1;
+        print count;
+    }
+
+    return increment;
+}
+
+var increment = buildCounter();
+// Local variable count has been closed on
+increment();

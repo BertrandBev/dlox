@@ -27,16 +27,8 @@ class CodeEditorState extends State<CodeEditor> {
   @override
   void initState() {
     super.initState();
-    final source = """// Capabilites showoff
-fun fib(n) {
-  if (n < 2) return n;
-  return fib(n - 2) + fib(n - 1);
-}
-print fib(3);
-""";
     // Instantiate the CodeController
     _codeController = CodeController(
-      text: source,
       language: lox,
       theme: monokaiSublimeTheme,
     );
@@ -48,6 +40,10 @@ print fib(3);
     _codeController.removeListener(_onCodeChange);
     _codeController.dispose();
     super.dispose();
+  }
+
+  void setSource(String source) {
+    _codeController.text = source;
   }
 
   void _onCodeChange() {

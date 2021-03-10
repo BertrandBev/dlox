@@ -27,7 +27,7 @@ void argTypeError(int index, Type expected, Type received) {
 void assertTypes(
     List<Object> stack, int argIdx, int argCount, List<Type> types) {
   if (argCount != types.length) argCountError(types.length, argCount);
-  for (int k = 0; k < types.length; k++) {
+  for (var k = 0; k < types.length; k++) {
     if (types[k] != Object && stack[argIdx + k].runtimeType != types[k]) {
       argTypeError(0, double, stack[argIdx + k]);
     }
@@ -134,6 +134,7 @@ double atanNative(List<Object> stack, int argIdx, int argCount) {
 
 // ignore: non_constant_identifier_names
 final NATIVE_FUNCTIONS = <ObjNative>[
+  ObjNative('clock', 0, clockNative),
   ObjNative('min', 2, minNative),
   ObjNative('max', 2, maxNative),
   ObjNative('floor', 1, floorNative),

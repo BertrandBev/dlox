@@ -1,5 +1,4 @@
 import 'package:dlox/chunk.dart';
-import 'package:dlox/common.dart';
 import 'package:dlox/debug.dart';
 import 'package:dlox/error.dart';
 import 'package:dlox/object.dart';
@@ -86,9 +85,15 @@ class Compiler {
   final List<Upvalue> upvalues = [];
   int scopeDepth = 0;
   // Degug tracer
+  bool traceBytecode;
   Tracer tracer;
 
-  Compiler._(this.type, {this.parser, this.enclosing}) {
+  Compiler._(
+    this.type, {
+    this.parser,
+    this.enclosing,
+    this.traceBytecode = false,
+  }) {
     function = ObjFunction();
     if (enclosing != null) {
       assert(parser == null);
@@ -96,6 +101,7 @@ class Compiler {
       tracer = enclosing.tracer;
       currentClass = enclosing.currentClass;
       scopeDepth = enclosing.scopeDepth + 1;
+      traceBytecode = enclosing.traceBytecode;
     } else {
       assert(parser != null);
       tracer = Tracer();
@@ -110,10 +116,15 @@ class Compiler {
     locals.add(Local(name, depth: 0));
   }
 
-  static CompilerResult compile(List<Token> tokens, {bool silent = false}) {
+  static CompilerResult compile(List<Token> tokens,
+      {bool silent = false, bool traceBytecode = false}) {
     // Compile script
     final parser = Parser(tokens, silent: silent);
-    final compiler = Compiler._(FunctionType.SCRIPT, parser: parser);
+    final compiler = Compiler._(
+      FunctionType.SCRIPT,
+      parser: parser,
+      traceBytecode: traceBytecode,
+    );
     parser.advance();
     while (!compiler.match(TokenType.EOF)) {
       compiler.declaration();
@@ -130,7 +141,7 @@ class Compiler {
 
   ObjFunction endCompiler() {
     emitReturn();
-    if (parser.errors.isEmpty) {
+    if (parser.errors.isEmpty && traceBytecode) {
       parser.debug.disassembleChunk(currentChunk, function.name ?? '<script>');
     }
     return function;

@@ -39,6 +39,43 @@ class _RuntimeToolbarState extends State<RuntimeToolbar> {
     );
   }
 
+  Widget buildSpeedBtn(BuildContext context) {
+    final runtime = context.watch<Runtime>();
+    final enabled = !runtime.vmTraceEnabled;
+    final color = enabled ? Colors.grey.shade800 : Colors.transparent;
+    final iconColor = enabled ? Colors.white : Colors.grey;
+    final btn = RawMaterialButton(
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+      onPressed: () => runtime.toggleVmTrace(),
+      constraints: BoxConstraints(minWidth: 0, minHeight: 0),
+      child: Icon(MaterialCommunityIcons.speedometer, color: iconColor),
+      fillColor: color,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: Colors.grey.shade800),
+        borderRadius: BorderRadius.all(Radius.circular(8.0)),
+      ),
+    );
+    double ips = runtime.averageIps.toDouble();
+    var suffix = "";
+    if (ips > 1000000) {
+      ips /= 1000000;
+      suffix = "M";
+    } else if (ips > 1000) {
+      ips /= 1000;
+      suffix = "k";
+    }
+    final ipsStr = ips.toStringAsFixed(suffix.isNotEmpty ? 2 : 0);
+    return Row(children: [
+      Text(
+        "$ipsStr$suffix ips",
+        style: TextStyle(color: Colors.white, fontSize: 16.0),
+      ),
+      SizedBox(width: 4.0),
+      btn,
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final color = Colors.white;
@@ -72,12 +109,15 @@ class _RuntimeToolbarState extends State<RuntimeToolbar> {
       rightToggle: widget.layout.toggleVm,
     );
 
+    final speedBtn = buildSpeedBtn(context);
+
     final row = Row(
       children: [
         stepBtn,
         runBtn,
         clearBtn,
         Spacer(),
+        speedBtn,
         toggleBtn,
       ],
     );

@@ -1,7 +1,6 @@
 import 'dart:math';
 
 import 'package:dlox/chunk.dart';
-import 'package:dlox/common.dart';
 import 'package:dlox/compiler.dart';
 import 'package:dlox/debug.dart';
 import 'package:dlox/error.dart';
@@ -80,7 +79,7 @@ class VM {
   Debug traceDebug;
   Debug stdout;
 
-  VM({bool silent}) {
+  VM({bool silent = false}) {
     errDebug = Debug(silent);
     traceDebug = Debug(silent);
     stdout = Debug(silent);

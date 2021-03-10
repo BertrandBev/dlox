@@ -1,5 +1,4 @@
 import 'package:sprintf/sprintf.dart';
-import 'common.dart';
 import 'debug.dart';
 
 enum TokenType {
@@ -216,6 +215,7 @@ class Scanner {
   Loc loc = Loc(0, 0);
   // Mark line as comment
   bool commentLine = false;
+  bool traceScanner = false;
 
   Scanner._(this.source);
 
@@ -226,7 +226,7 @@ class Scanner {
       tokens.add(scanner.scanToken());
     } while (tokens.last.type != TokenType.EOF);
     if (!eof) tokens.removeLast();
-    if (DEBUG_TRACE_SCANNER) {
+    if (scanner.traceScanner) {
       var line = -1;
       tokens.forEach((token) {
         if (token.loc.i != line) {

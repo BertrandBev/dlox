@@ -9,12 +9,14 @@ class Monitor extends StatefulWidget {
   final IconData icon;
   final String title;
   final bool autoScroll;
+  final Widget Function(Widget) placeholderBuilder;
 
   Monitor({
     Key key,
     this.lines,
     this.icon,
     this.title,
+    this.placeholderBuilder,
     this.autoScroll = true,
   }) : super(key: key);
 
@@ -47,26 +49,30 @@ class MonitorState extends State<Monitor> {
             MatchText(
               pattern: r"-?\d+(?:\.\d+)?",
               style: TextStyle(
-                color: Colors.red,
+                color: ColorTheme.numbers,
               ),
             ),
             MatchText(
               pattern: r"OP_[A-Z_]+",
               style: TextStyle(
-                color: Colors.green,
+                color: ColorTheme.functions,
               ),
             ),
             MatchText(
               pattern: r"==.+==",
-              style: TextStyle(color: Colors.blue),
+              style: TextStyle(color: ColorTheme.debugValues),
             ),
             MatchText(
               pattern: r"'.+'",
-              style: TextStyle(color: Colors.yellow),
+              style: TextStyle(color: ColorTheme.strings),
             ),
             MatchText(
               pattern: r"true|false",
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: ColorTheme.numbers),
+            ),
+            MatchText(
+              pattern: r"(Runtime error)|(Compiler error)",
+              style: TextStyle(color: ColorTheme.error),
             ),
           ],
         );
@@ -79,8 +85,9 @@ class MonitorState extends State<Monitor> {
     final col = Column(children: [
       Flexible(child: lv),
     ]);
-    final placeholder = Center(
-      child: Row(
+    Widget placeholder = SizedBox.shrink();
+    if (widget.lines.isEmpty) {
+      Widget child = Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
@@ -96,8 +103,11 @@ class MonitorState extends State<Monitor> {
             ),
           ),
         ],
-      ),
-    );
+      );
+      if (widget.placeholderBuilder != null)
+        child = widget.placeholderBuilder(child);
+      placeholder = Center(child: child);
+    }
     return Container(
       color: ColorTheme.terminal,
       child: widget.lines.isEmpty ? placeholder : col,

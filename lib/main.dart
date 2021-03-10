@@ -3,20 +3,18 @@ import 'dart:io';
 import 'package:dlox/scanner.dart';
 import 'package:dlox/vm.dart';
 import 'compiler.dart';
-import 'debug.dart';
-
-final debug = Debug(false);
 
 void repl() {
   final vm = VM();
   while (true) {
-    debug.stdwrite('> ');
+    stdout.write('> ');
     final line = stdin.readLineSync(encoding: Encoding.getByName('utf-8'));
     if (line == null) break;
     final tokens = Scanner.scan(line + '\n');
     final compilerResult = Compiler.compile(tokens);
     if (compilerResult.errors.isNotEmpty) continue;
-    vm.setFunction(compilerResult, FunctionParams());
+    final globals = Map.fromEntries(vm.globals.data.entries);
+    vm.setFunction(compilerResult, FunctionParams(globals: globals));
     vm.run();
   }
 }
@@ -39,15 +37,15 @@ void runFile(String path) {
 }
 
 void main(List<String> args) async {
-  final path =
-      '/Users/bbevillard/Documents/Bev/Code/Flutter/paradigm/lib/lang/examples/';
-  args = [path + 'easy.txt'];
+  // final path =
+  //     '/Users/bbevillard/Documents/Bev/Code/Flutter/paradigm/lib/lang/examples/';
+  // args = [path + 'easy.txt'];
   if (args.isEmpty) {
     repl();
   } else if (args.length == 1) {
     runFile(args[0]);
   } else {
-    debug.stdwriteln('Usage: clox [path]');
+    print('Usage: dart main.dart [path]');
     exit(64);
   }
 }

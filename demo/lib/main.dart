@@ -90,17 +90,37 @@ class _HomePageState extends State<HomePage> {
       icon: MaterialCommunityIcons.matrix,
       title: "Bytecode",
     );
+    var monitorTitle = "VM trace";
     final vmMonitor = Monitor(
       key: vmKey,
       lines: runtime.vmOut,
       icon: MaterialCommunityIcons.magnify,
-      title: "VM trace",
+      placeholderBuilder: (widget) {
+        if (!runtime.vmTraceEnabled)
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              widget,
+              SizedBox(height: 4.0),
+              Text("disabled for performance",
+                  style: TextStyle(fontSize: 16.0, color: Colors.grey)),
+            ],
+          );
+        return widget;
+      },
+      title: monitorTitle,
     );
     final runtimeToolbar = RuntimeToolbar(
       layout: layout,
       onClear: () => runtime.clearOutput(),
     );
-    final editorToolbar = EditorToolbar(layout: layout);
+    final editorToolbar = EditorToolbar(
+      layout: layout,
+      onSnippet: (source) {
+        editorKey.currentState?.setSource(source);
+        runtime.reset();
+      },
+    );
 
     final topRow = Row(children: [
       if (layout.showEditor) Expanded(child: codeEditor),

@@ -6,7 +6,6 @@ import 'package:dlox/scanner.dart';
 import 'package:dlox/table.dart';
 import 'package:dlox/value.dart';
 
-import 'common.dart';
 import 'native.dart';
 import 'native_classes.dart';
 
@@ -255,8 +254,6 @@ String objectToString(Object value, {int maxChars = 100}) {
     return value.stringRepr(maxChars: maxChars);
   } else if (value is NativeClassCreator) {
     return '<native class>';
-  } else if (!DEBUG_TRACE_EXECUTION) {
-    throw Exception('Unsupported object type: $value');
-  }
+  } 
   return value.toString();
 }

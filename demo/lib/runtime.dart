@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:dlox/compiler.dart';
 import 'package:dlox/error.dart';
@@ -22,6 +23,11 @@ class Runtime extends ChangeNotifier {
   InterpreterResult interpreterResult;
   bool running = false;
   bool stopFlag = false;
+  bool vmTraceEnabled = true;
+
+  // Performance tracking
+  int timeStartedMs;
+  int averageIps = 0;
 
   // Buffers variables
   final stdout = <String>[];
@@ -53,6 +59,13 @@ class Runtime extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleVmTrace() {
+    vmTraceEnabled = !vmTraceEnabled;
+    vm.traceExecution = vmTraceEnabled;
+    if (!vmTraceEnabled) vmOut.clear();
+    notifyListeners();
+  }
+
   void clearOutput() {
     stdout.clear();
     vmOut.clear();
@@ -81,7 +94,11 @@ class Runtime extends ChangeNotifier {
     if (source == null || (compiledSource == source && compilerResult != null))
       return;
     final tokens = Scanner.scan(source);
-    compilerResult = Compiler.compile(tokens, silent: true);
+    compilerResult = Compiler.compile(
+      tokens,
+      silent: true,
+      traceBytecode: true,
+    );
     compiledSource = source;
     // Clear monitors
     compilerOut.clear();
@@ -105,7 +122,6 @@ class Runtime extends ChangeNotifier {
     if (vm.compilerResult != compilerResult) {
       vm.setFunction(compilerResult, FunctionParams());
       interpreterResult = null;
-      // onCompilerResult(compilerResult);
     }
     return true;
   }
@@ -113,7 +129,7 @@ class Runtime extends ChangeNotifier {
   void _onInterpreterResult() {
     _populateBuffer(stdout, vm.stdout.clear());
     _populateBuffer(vmOut, vm.traceDebug.clear());
-    _processErrors(compilerResult.errors);
+    _processErrors(interpreterResult?.errors);
     onInterpreterResult(interpreterResult);
     notifyListeners();
   }
@@ -132,12 +148,16 @@ class Runtime extends ChangeNotifier {
     running = true;
     notifyListeners();
     vm.stepCode = false;
+    timeStartedMs = DateTime.now().millisecondsSinceEpoch;
 
     while (!done && !stopFlag) {
       interpreterResult = vm.stepBatch(
         // Cope with expensive tracing
-        batchCount: vm.traceExecution ? 100 : 100000,
+        batchCount: vm.traceExecution ? 100 : 500000,
       );
+      // Update Ips counter
+      final dt = DateTime.now().millisecondsSinceEpoch - timeStartedMs;
+      averageIps = vm.stepCount ~/ max(1, dt ~/ 1000);
       _onInterpreterResult();
       await Future.delayed(Duration(seconds: 0));
     }
@@ -152,7 +172,7 @@ class Runtime extends ChangeNotifier {
     if (compilerResult == null) return;
     if (compilerResult.errors.isNotEmpty) return;
     // Clear output
-    onCompilerResult(compilerResult);
+    clearOutput();
     // Set interpreter
     vm.setFunction(compilerResult, FunctionParams());
     interpreterResult = null;

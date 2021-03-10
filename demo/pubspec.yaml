@@ -14,6 +14,7 @@ dependencies:
   flutter_icons: ^1.1.0
   flutter_parsed_text: ^2.1.0
   provider: ^5.0.0
+  url_launcher: ^6.0.2
   sprintf: ^6.0.0 # WHY?
   code_text_field:
     path: ../../../Flutter/code_field/
@@ -31,6 +32,8 @@ dev_dependencies:
 # The following section is specific to Flutter.
 flutter:
   uses-material-design: true
+  assets:
+    - assets/snippets/
   fonts:
     - family: SourceCode
       fonts:

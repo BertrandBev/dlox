@@ -149,6 +149,8 @@ class Debug {
         return simpleInstruction('OP_MULTIPLY', offset);
       case OpCode.DIVIDE:
         return simpleInstruction('OP_DIVIDE', offset);
+      case OpCode.POW:
+        return simpleInstruction('OP_POW', offset);
       case OpCode.NOT:
         return simpleInstruction('OP_NOT', offset);
       case OpCode.NEGATE:
