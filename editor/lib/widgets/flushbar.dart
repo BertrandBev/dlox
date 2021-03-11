@@ -11,8 +11,10 @@ class Flushbar {
     String msg, {
     FlushbarType type = FlushbarType.INFO,
   }) {
-    final icon = type == FlushbarType.INFO ? Icons.info_outline : Icons.error_outline;
-    final color = type == FlushbarType.INFO ? Colors.blueAccent : Colors.redAccent;
+    final icon =
+        type == FlushbarType.INFO ? Icons.info_outline : Icons.error_outline;
+    final color =
+        type == FlushbarType.INFO ? Colors.blueAccent : Colors.redAccent;
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -27,7 +29,9 @@ class Flushbar {
             children: [
               Icon(icon, color: color),
               SizedBox(width: 8.0),
-              Text(msg, style: TextStyle(fontSize: 16.0)),
+              Flexible(
+                child: Text(msg, style: TextStyle(fontSize: 16.0)),
+              ),
             ],
           ),
         ),

@@ -40,7 +40,7 @@ class _EditorToolbarState extends State<EditorToolbar> {
       pathMap[fname(el)] = el;
     });
     // Set first snippet
-    await setSnippet("linked list");  // Default file
+    await setSnippet("fibonacci");  // Default file
   }
 
   Future setSnippet(String fname) async {
@@ -99,7 +99,7 @@ class _EditorToolbarState extends State<EditorToolbar> {
       padding: EdgeInsets.only(left: 8.0),
       icon: Icon(FontAwesome5Brands.github, color: Colors.white),
       onPressed: () =>
-          _launchInBrowser("https://github.com/BertrandBev/code_field"),
+          _launchInBrowser("https://github.com/BertrandBev/dlox"),
     );
 
     final snippets = buildDropdown();

@@ -1,22 +1,22 @@
 class Node {
-    // Initialize a linkedlist node
-    fun init(val, next) {
-        this.val = val;
-        this.next = next;
-    }
+  // Initialize a linkedlist node
+  fun init(val, next) {
+    this.val = val;
+    this.next = next;
+  }
 
-    // Traverse the linked-list and print it in a string
-    fun toString() {
-        var buf = "[";
-        var node = this;
-        while (node != nil) {
-            buf += node.val;
-            node = node.next;
-            if (node != nil)
-                buf += ", ";
-        }
-        return buf + "]";
+  // Traverse the linked-list and print it in a string
+  fun toString() {
+    var buf = "[";
+    var node = this;
+    while (node != nil) {
+      buf += node.val;
+      node = node.next;
+      if (node != nil)
+        buf += ", ";
     }
+    return buf + "]";
+  }
 }
 
 var c = Node("c", nil);

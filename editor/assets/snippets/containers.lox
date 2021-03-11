@@ -1,24 +1,24 @@
 fun exploreList() {
-    // Mixed type list container
-    var list = [1, "two", [3, 4]];
-    print list;
-    print list[1:];
-    print list[:-1];
+  // Mixed type list container
+  var list = [1, "two", [3, 4]];
+  print list;
+  print list[1:];
+  print list[:-1];
 }
 
 fun exploreMap() {
-    // Mixed type map container
-    var map = {"a": 1, "b": "string", "c": [1, 2]};
-    print map;
-    print map["a"];
+  // Mixed type map container
+  var map = {"a": 1, "b": "string", "c": [1, 2]};
+  print map;
+  print map["a"];
 }
 
 fun exploreStrings() {
-    // String operations
-    var str = "list: ";
-    str += [1, 2];
-    str += " " + {1: 2} + "#";
-    print str[:-1];
+  // String operations
+  var str = "list: ";
+  str += [1, 2];
+  str += " " + {1: 2} + "#";
+  print str[:-1];
 }
 
 exploreList();

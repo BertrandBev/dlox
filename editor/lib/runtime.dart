@@ -5,6 +5,7 @@ import 'package:dlox/compiler.dart';
 import 'package:dlox/error.dart';
 import 'package:dlox/scanner.dart';
 import 'package:dlox/vm.dart';
+import 'package:flutter/material.dart';
 
 class Runtime extends ChangeNotifier {
   // State hooks

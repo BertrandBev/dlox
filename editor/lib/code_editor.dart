@@ -6,7 +6,7 @@ import 'package:dlox/vm.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_highlight/themes/monokai-sublime.dart';
-import 'package:code_text_field/code_field.dart';
+import 'package:code_text_field/code_text_field.dart';
 import 'package:flutter_highlight/themes/monokai-sublime.dart'
     show monokaiSublimeTheme;
 
