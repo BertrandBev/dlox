@@ -1,20 +1,20 @@
 // To get good performances, disable the VM trace
 fun benchmark() {
-    var start = clock();
-    var list = [];
-    for (var k = 0; k < 100000; k += 1) {
-        list.add(k);
-    }
-    var elapsed = clock() - start;
-    print "Creating list: " + elapsed + "ms";
-    start = clock();
-    var sum = 0;
-    for (var k = 0; k < list.length(); k += 1) {
-        sum += list[k];
-    }
-    // sum /= list.length();
-    elapsed = clock() - start;
-    print "Averaging: " + elapsed + "ms";
+  var start = clock();
+  var list = [];
+  for (var k = 0; k < 100000; k += 1) {
+    list.add(k);
+  }
+  var elapsed = clock() - start;
+  print "Creating list: " + elapsed + "ms";
+  start = clock();
+  var sum = 0;
+  for (var k = 0; k < list.length(); k += 1) {
+    sum += list[k];
+  }
+  // sum /= list.length();
+  elapsed = clock() - start;
+  print "Averaging: " + elapsed + "ms";
 }
 
 benchmark();

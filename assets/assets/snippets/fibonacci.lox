@@ -8,7 +8,7 @@ fun fib(n) {
 var N = 6;
 var buf = "[";
 for (var k = 0; k < N; k += 1) {
-    buf += fib(k);
-    if (k < N - 1) buf += ", ";
+  buf += fib(k);
+  if (k < N - 1) buf += ", ";
 }
 print buf + "]";
