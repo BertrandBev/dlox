@@ -1,6 +1,6 @@
 # dlox
 
-A fully featured VM written in dart
+A full-featured VM written in dart
 
 [![Website shields.io](https://img.shields.io/website-up-down-green-red/http/shields.io.svg)](https://bertrandbev.github.io/dlox/)
 [![GitHub license](https://img.shields.io/github/license/Naereen/StrapDown.js.svg)](https://raw.githubusercontent.com/BertrandBev/dlox/master/LICENSE)
@@ -89,7 +89,7 @@ OP_NIL               // Push NIL on the stack
 OP_RETURN            // Pop and return the last stack value
 ```
 
-Wow, that seems a lot for such a simple program! Well, breaking it down in simple instructions allows the Virtual machine to execute it in a really streamlined fashion. All it needs to to to execute it is rip through the instructions one by one while carefully bookkeeping a map of the global variables and managing the scrachpad called the stack
+Wow, that seems a lot for such a simple program! Well, breaking it down in simple instructions allows the Virtual machine to execute it in a really streamlined fashion. All it needs to do is rip through the instructions one by one while carefully bookkeeping the global variables and managing the stack
 
 Now run that nifty piece of code. The terminal output should print `9`. The bottom right panel shows the VM trace
 > On small screens, the VM panel is hidden by default. Press the rightmost button on the bottom toolbar to show it

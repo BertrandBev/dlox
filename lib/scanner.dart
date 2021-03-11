@@ -87,8 +87,8 @@ const TOKEN_REPR = {
   TokenType.PERCENT: '%',
   TokenType.CARET: '^',
   TokenType.EQUAL: '=',
-  TokenType.AND: '&',
-  TokenType.OR: '|',
+  TokenType.AND: 'and',
+  TokenType.OR: 'or',
 
   // Comparators
   TokenType.BANG_EQUAL: '!=',
@@ -322,9 +322,10 @@ class Scanner {
     }
   }
 
-  TokenType checkKeyword(int start, int length, String rest, TokenType type) {
-    if (current - this.start == start + length &&
-        source.substring(this.start + start, this.start + start + length) ==
+  TokenType checkKeyword(int start, String rest, TokenType type) {
+    if (current - this.start == start + rest.length &&
+        source.substring(
+                this.start + start, this.start + start + rest.length) ==
             rest) {
       return type;
     }
@@ -333,29 +334,31 @@ class Scanner {
 
   TokenType identifierType() {
     switch (charAt(start)) {
+      case 'a':
+        return checkKeyword(1, 'nd', TokenType.AND);
       case 'b':
-        return checkKeyword(1, 4, 'reak', TokenType.BREAK);
+        return checkKeyword(1, 'reak', TokenType.BREAK);
       case 'c':
         if (current - start > 1) {
           switch (charAt(start + 1)) {
             case 'l':
-              return checkKeyword(2, 3, 'ass', TokenType.CLASS);
+              return checkKeyword(2, 'ass', TokenType.CLASS);
             case 'o':
-              return checkKeyword(2, 6, 'ntinue', TokenType.CONTINUE);
+              return checkKeyword(2, 'ntinue', TokenType.CONTINUE);
           }
         }
         break;
       case 'e':
-        return checkKeyword(1, 3, 'lse', TokenType.ELSE);
+        return checkKeyword(1, 'lse', TokenType.ELSE);
       case 'f':
         if (current - start > 1) {
           switch (charAt(start + 1)) {
             case 'a':
-              return checkKeyword(2, 3, 'lse', TokenType.FALSE);
+              return checkKeyword(2, 'lse', TokenType.FALSE);
             case 'o':
-              return checkKeyword(2, 1, 'r', TokenType.FOR);
+              return checkKeyword(2, 'r', TokenType.FOR);
             case 'u':
-              return checkKeyword(2, 1, 'n', TokenType.FUN);
+              return checkKeyword(2, 'n', TokenType.FUN);
           }
         }
         break;
@@ -363,34 +366,36 @@ class Scanner {
         if (current - start > 1) {
           switch (charAt(start + 1)) {
             case 'f':
-              return checkKeyword(2, 0, '', TokenType.IF);
+              return checkKeyword(2, '', TokenType.IF);
             case 'n':
-              return checkKeyword(2, 0, '', TokenType.IN);
+              return checkKeyword(2, '', TokenType.IN);
           }
         }
         break;
       case 'n':
-        return checkKeyword(1, 2, 'il', TokenType.NIL);
+        return checkKeyword(1, 'il', TokenType.NIL);
+      case 'o':
+        return checkKeyword(1, 'r', TokenType.OR);
       case 'p':
-        return checkKeyword(1, 4, 'rint', TokenType.PRINT);
+        return checkKeyword(1, 'rint', TokenType.PRINT);
       case 'r':
-        return checkKeyword(1, 5, 'eturn', TokenType.RETURN);
+        return checkKeyword(1, 'eturn', TokenType.RETURN);
       case 's':
-        return checkKeyword(1, 4, 'uper', TokenType.SUPER);
+        return checkKeyword(1, 'uper', TokenType.SUPER);
       case 't':
         if (current - start > 1) {
           switch (charAt(start + 1)) {
             case 'h':
-              return checkKeyword(2, 2, 'is', TokenType.THIS);
+              return checkKeyword(2, 'is', TokenType.THIS);
             case 'r':
-              return checkKeyword(2, 2, 'ue', TokenType.TRUE);
+              return checkKeyword(2, 'ue', TokenType.TRUE);
           }
         }
         break;
       case 'v':
-        return checkKeyword(1, 2, 'ar', TokenType.VAR);
+        return checkKeyword(1, 'ar', TokenType.VAR);
       case 'w':
-        return checkKeyword(1, 4, 'hile', TokenType.WHILE);
+        return checkKeyword(1, 'hile', TokenType.WHILE);
     }
     return TokenType.IDENTIFIER;
   }
@@ -503,10 +508,6 @@ class Scanner {
         return makeToken(TokenType.PERCENT);
       case '^':
         return makeToken(TokenType.CARET);
-      case '&':
-        return makeToken(TokenType.AND);
-      case '|':
-        return makeToken(TokenType.OR);
     }
 
     return errorToken('Unexpected character: $c.');

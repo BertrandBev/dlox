@@ -1,1 +1,1 @@
-foo(a | b); // Runtime error: Undefined variable 'foo'.
+foo(a or b); // Runtime error: Undefined variable 'foo'.

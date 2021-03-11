@@ -75,7 +75,7 @@ class _RuntimeToolbarState extends State<RuntimeToolbar> {
       onTap: () {
         Flushbar.show(
           context,
-          "Measures the average number of instructions per seconds",
+          "Measures the average number of instructions per second",
         );
       },
     );
