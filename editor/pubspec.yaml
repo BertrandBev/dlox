@@ -16,10 +16,10 @@ dependencies:
   provider: ^5.0.0
   url_launcher: ^6.0.2
   sprintf: ^6.0.0 # WHY?
-  code_text_field: ^1.0.0-5
+  code_text_field: ^1.0.0-7
   dlox:
     path: ../
-  
+
 
 dev_dependencies:
   flutter_test:

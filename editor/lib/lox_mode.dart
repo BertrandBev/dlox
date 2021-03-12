@@ -38,7 +38,7 @@ final lox = Mode(refs: {
     ])
   ]),
 }, keywords: {
-  "keyword": "class else false for if nil return super this true var while fun",
+  "keyword": "class else false for if nil return super this true var while fun in print",
   "built_in": ""
 }, contains: [
   Mode(ref: '~contains~0'),

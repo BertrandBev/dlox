@@ -51,7 +51,7 @@ class CodeEditorState extends State<CodeEditor> {
   }
 
   void _onSourceChange() {
-    widget.runtime.setSource(_codeController.text);
+    widget.runtime.setSource(_codeController.rawText);
   }
 
   void _setErrors(List<LangError> errors) {
