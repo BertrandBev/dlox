@@ -987,21 +987,16 @@ class VM {
 
         case OpCode.CONTAINER_ITERATE:
           {
-            // Retrieve values
-            final keyOpIdx = readByte(frame);
-            final valOpIdx = readByte(frame);
-            final keyIdx = frame.chunk.code[keyOpIdx];
-            final valIdx = frame.chunk.code[valOpIdx];
-            // print("code: ${frame.chunk.code}");
-            // print("key op idx: $keyOpIdx val op idx $valOpIdx");
-            // print("KEY IDX: $keyIdx valIdx $valIdx");
-            final idxIdx = valIdx + 1;
-            final iterableIdx = valIdx + 2;
+            // Init stack indexes
+            var valIdx = readByte(frame);
+            var keyIdx = valIdx + 1;
+            final idxIdx = valIdx + 2;
+            final iterableIdx = valIdx + 3;
+            final containerIdx = valIdx + 4;
             // Retreive data
             var idxObj = stack[frame.slotsIdx + idxIdx];
             // Initialize
             if (idxObj == Nil) {
-              final containerIdx = valIdx + 3;
               final container = stack[frame.slotsIdx + containerIdx];
               idxObj = 0.0;
               if (container is String) {
@@ -1014,7 +1009,7 @@ class VM {
               } else {
                 return runtimeError('Iterable must be Strings, Lists or Maps');
               }
-              // Pop from stack
+              // Pop container from stack
               pop();
             }
             // Iterate

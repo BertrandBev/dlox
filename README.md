@@ -28,9 +28,46 @@ dlox is a strict superset of the fantastic [lox](https://github.com/munificent/c
 
 ## Extensions
 - Suport for list and maps
+
+```javascript
+var list = [1, 2, 3];
+var map = {"a": 1, "b": 2};
+```
+
+- Container indexing
+
+```javascript
+print [1, 2, 3, 4][1:-1]; // [2,3]
+print "a cool feature"[2:]; // "cool feature"
+```
+
 - Container traversal
+
+```javascript
+for v in "test" {
+    print v; // t, e, s, t
+}
+for v in [1, 2, 3] {
+    print v; // 1, 2, 3
+}
+// All containers also support index extraction
+for v, k in {"a": 1, "b": 2} {
+    print k + " " + v; // 0 a, 1 b
+}
+```
+
 - Usual mathematical functions
+
+```javascript
+var theta = 3.14 / 4;
+var a = sin(theta);
+var b = sqrt(1 - cos(theta)^2);
+var c = ceil(abs(round(-theta)));
+```
+
 - Controlled execution
+
+> Pause on each line, and limit the number of instructions per run for asyncronous execution
 
 ## Using the CLI
 

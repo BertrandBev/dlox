@@ -769,7 +769,7 @@ class Compiler {
   }
 
   void method() {
-    // Methods don't require identifiers
+    // Methods don't require
     // consume(TokenType.FUN, 'Expect function identifier');
     consume(TokenType.IDENTIFIER, 'Expect method name');
     final identifier = parser.previous;
@@ -907,18 +907,21 @@ class Compiler {
 
   void forStatement() {
     beginScope();
-    // Key
+    // Key variable
     parseVariable('Expect variable name'); // Streamline those operations
     emitOp(OpCode.NIL);
-    defineVariable(0, token: parser.previous); // remove 0
-    var keyOpIdx = currentChunk.count - 1;
-    var valOpIdx = keyOpIdx;
+    defineVariable(0, token: parser.previous); // Remove 0
+    var stackIdx = locals.length - 1;
     if (match(TokenType.COMMA)) {
-      // Value
+      // Value variable
       parseVariable('Expect variable name');
       emitOp(OpCode.NIL);
       defineVariable(0, token: parser.previous);
-      valOpIdx = currentChunk.count - 1;
+    } else {
+      // Create dummy value slot
+      addLocal(syntheticToken('_for_val_'));
+      emitConstant(0); // Emit a zero to permute val & key
+      markLocalVariableInitialized();
     }
     // Now add two dummy local variables. Idx & entries
     addLocal(syntheticToken('_for_idx_'));
@@ -932,8 +935,7 @@ class Compiler {
     expression(); // Iterable
     // Iterator
     final loopStart = currentChunk.count;
-    emitOp(OpCode.CONTAINER_ITERATE);
-    emitBytes(keyOpIdx, valOpIdx);
+    emitBytes(OpCode.CONTAINER_ITERATE.index, stackIdx);
     final exitJump = emitJump(OpCode.JUMP_IF_FALSE);
     emitOp(OpCode.POP); // Condition
     // Body
