@@ -4,6 +4,9 @@ fun exploreList() {
   print list;
   print list[1:];
   print list[:-1];
+  for v, k in list {
+    print k + " " + v;
+  }
 }
 
 fun exploreMap() {
@@ -11,6 +14,9 @@ fun exploreMap() {
   var map = {"a": 1, "b": "string", "c": [1, 2]};
   print map;
   print map["a"];
+  for v, k in map {
+    print k + " " + v;
+  }
 }
 
 fun exploreStrings() {
@@ -19,6 +25,10 @@ fun exploreStrings() {
   str += [1, 2];
   str += " " + {1: 2} + "#";
   print str[:-1];
+  for v, k in str[:4] {
+    print k + " " + v;
+  }
+
 }
 
 exploreList();
