@@ -1,5 +1,5 @@
 class Foo {
-  fun method() {
+  method() {
     print method; // Runtime error: Undefined variable 'method'.
   }
 }

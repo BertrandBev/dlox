@@ -1,12 +1,12 @@
 class Node {
   // Initialize a linkedlist node
-  fun init(val, next) {
+  init(val, next) {
     this.val = val;
     this.next = next;
   }
 
   // Traverse the linked-list and print it in a string
-  fun toString() {
+  toString() {
     var buf = "[";
     var node = this;
     while (node != nil) {

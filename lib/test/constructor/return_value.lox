@@ -1,5 +1,5 @@
 class Foo {
-  fun init() {
+  init() {
     return "result"; // Error at 'return': Can't return a value from an initializer.
   }
 }

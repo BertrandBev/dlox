@@ -1,5 +1,5 @@
 class Foo {
-  fun init() {
+  init() {
     print "init";
     return;
     print "nope";

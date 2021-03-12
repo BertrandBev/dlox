@@ -1,11 +1,11 @@
 class Base {
-  fun init(a, b) {
+  init(a, b) {
     print "Base.init(" + a + ", " + b + ")";
   }
 }
 
 class Derived < Base {
-  fun init() {
+  init() {
     print "Derived.init()";
     super.init("a", "b");
   }

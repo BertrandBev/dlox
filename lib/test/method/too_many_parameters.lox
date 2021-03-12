@@ -1,6 +1,6 @@
 class Foo {
   // 256 parameters.
-  fun method(
+  method(
     a1,
     a2,
     a3,

@@ -1,5 +1,5 @@
 class Base {
-  fun foo() {
+  foo() {
     super.doesNotExist; // Error at 'super': Can't use 'super' in a class with no superclass.
   }
 }

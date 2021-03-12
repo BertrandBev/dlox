@@ -1,5 +1,5 @@
 class Foo {
-  fun getClosure() {
+  getClosure() {
     fun f() {
       fun g() {
         fun h() {
@@ -12,7 +12,7 @@ class Foo {
     return f;
   }
 
-  fun toString() { return "Foo"; }
+  toString() { return "Foo"; }
 }
 
 var closure = Foo().getClosure();

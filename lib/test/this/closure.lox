@@ -1,12 +1,12 @@
 class Foo {
-  fun getClosure() {
+  getClosure() {
     fun closure() {
       return this.toString();
     }
     return closure;
   }
 
-  fun toString() { return "Foo"; }
+  toString() { return "Foo"; }
 }
 
 var closure = Foo().getClosure();

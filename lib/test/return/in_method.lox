@@ -1,5 +1,5 @@
 class Foo {
-  fun method() {
+  method() {
     return "ok";
     print "bad";
   }

@@ -1,11 +1,11 @@
 class Foo {
-  fun methodOnFoo() { print "foo"; }
-  fun override() { print "foo"; }
+  methodOnFoo() { print "foo"; }
+  override() { print "foo"; }
 }
 
 class Bar < Foo {
-  fun methodOnBar() { print "bar"; }
-  fun override() { print "bar"; }
+  methodOnBar() { print "bar"; }
+  override() { print "bar"; }
 }
 
 var bar = Bar();

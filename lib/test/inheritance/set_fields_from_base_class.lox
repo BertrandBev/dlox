@@ -1,22 +1,22 @@
 class Foo {
-  fun foo(a, b) {
+  foo(a, b) {
     this.field1 = a;
     this.field2 = b;
   }
 
-  fun fooPrint() {
+  fooPrint() {
     print this.field1;
     print this.field2;
   }
 }
 
 class Bar < Foo {
-  fun bar(a, b) {
+  bar(a, b) {
     this.field1 = a;
     this.field2 = b;
   }
 
-  fun barPrint() {
+  barPrint() {
     print this.field1;
     print this.field2;
   }

@@ -1,11 +1,11 @@
 class Base {
-  fun foo(a, b) {
+  foo(a, b) {
     print "Base.foo(" + a + ", " + b + ")";
   }
 }
 
 class Derived < Base {
-  fun foo() {
+  foo() {
     super.foo(1); // Runtime error: Expected 2 arguments but got 1.
   }
 }

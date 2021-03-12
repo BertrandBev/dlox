@@ -1,21 +1,21 @@
 class A {
-  fun say() {
+  say() {
     print "A";
   }
 }
 
 class B < A {
-  fun test() {
+  test() {
     super.say();
   }
 
-  fun say() {
+  say() {
     print "B";
   }
 }
 
 class C < B {
-  fun say() {
+  say() {
     print "C";
   }
 }

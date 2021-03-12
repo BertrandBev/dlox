@@ -1,5 +1,5 @@
 class Foo {
-  fun Foo() {
+  Foo() {
     this = "value"; // Error at '=': Invalid assignment target.
   }
 }

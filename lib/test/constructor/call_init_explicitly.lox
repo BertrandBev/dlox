@@ -1,5 +1,5 @@
 class Foo {
-  fun init(arg) {
+  init(arg) {
     print "Foo.init(" + arg + ")";
     this.field = "init";
   }

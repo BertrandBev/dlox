@@ -1,5 +1,5 @@
 class Foo {
-  fun method(a, b) {}
+  method(a, b) {}
 }
 
 Foo().method(1); // Runtime error: Expected 2 arguments but got 1.

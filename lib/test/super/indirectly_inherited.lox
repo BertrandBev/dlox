@@ -1,5 +1,5 @@
 class A {
-  fun foo() {
+  foo() {
     print "A.foo()";
   }
 }
@@ -7,7 +7,7 @@ class A {
 class B < A {}
 
 class C < B {
-  fun foo() {
+  foo() {
     print "C.foo()";
     super.foo();
   }

@@ -1,9 +1,9 @@
 class A {
-  fun init(param) {
+  init(param) {
     this.field = param;
   }
 
-  fun test() {
+  test() {
     print this.field;
   }
 }

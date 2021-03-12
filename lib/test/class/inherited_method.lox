@@ -1,17 +1,17 @@
 class Foo {
-  fun inFoo() {
+  inFoo() {
     print "in foo";
   }
 }
 
 class Bar < Foo {
-  fun inBar() {
+  inBar() {
     print "in bar";
   }
 }
 
 class Baz < Bar {
-  fun inBaz() {
+  inBaz() {
     print "in baz";
   }
 }

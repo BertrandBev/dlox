@@ -1,15 +1,15 @@
 class A {
-  fun method(arg) {
+  method(arg) {
     print "A.method(" + arg + ")";
   }
 }
 
 class B < A {
-  fun getClosure() {
+  getClosure() {
     return super.method;
   }
 
-  fun method(arg) {
+  method(arg) {
     print "B.method(" + arg + ")";
   }
 }

@@ -1,9 +1,9 @@
 class A {
-  fun method() {}
+  method() {}
 }
 
 class B < A {
-  fun method() {
+  method() {
     (super).method();  // Error at ')': Expect '.' after 'super'.
   }
 }

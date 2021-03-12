@@ -769,7 +769,8 @@ class Compiler {
   }
 
   void method() {
-    consume(TokenType.FUN, 'Expect function identifier');
+    // Methods don't require identifiers
+    // consume(TokenType.FUN, 'Expect function identifier');
     consume(TokenType.IDENTIFIER, 'Expect method name');
     final identifier = parser.previous;
     var constant = identifierConstant(identifier);

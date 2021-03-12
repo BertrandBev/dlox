@@ -1,24 +1,24 @@
 class A {
-  fun say() {
+  say() {
     print "A";
   }
 }
 
 class B < A {
-  fun getClosure() {
+  getClosure() {
     fun closure() {
       super.say();
     }
     return closure;
   }
 
-  fun say() {
+  say() {
     print "B";
   }
 }
 
 class C < B {
-  fun say() {
+  say() {
     print "C";
   }
 }
