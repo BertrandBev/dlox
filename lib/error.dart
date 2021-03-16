@@ -31,13 +31,14 @@ class LangError {
     } else {
       buf.write('$type error');
     }
-    buf.write(' : $msg');
+    buf.write(': $msg');
     return buf.toString();
   }
 }
 
 class CompilerError extends LangError {
-  CompilerError(Token token, String msg) : super('Compile', msg, token: token);
+  CompilerError(Token token, String msg)
+      : super('Compile', msg, token: token, line: token.loc.i);
 }
 
 class RuntimeError extends LangError {

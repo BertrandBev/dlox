@@ -52,6 +52,7 @@ enum OpCode {
 class Chunk {
   final List<int> code = [];
   final List<Object> constants = [];
+  final _constantMap = <Object, int>{};
   // Trace information
   final List<int> lines = [];
 
@@ -65,7 +66,11 @@ class Chunk {
   }
 
   int addConstant(Object value) {
+    final idx = _constantMap[value];
+    if (idx != null) return idx;
+    // Add entry
     constants.add(value);
+    _constantMap[value] = constants.length - 1;
     return constants.length - 1;
   }
 }

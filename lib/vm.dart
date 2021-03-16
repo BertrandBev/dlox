@@ -686,7 +686,6 @@ class VM {
             final b = pop();
             final a = pop();
             if ((a is double) && (b is double)) {
-              // String concatenation
               push(a + b);
             } else if ((a is String) && (b is String)) {
               push(a + b);

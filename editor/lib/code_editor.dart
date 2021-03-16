@@ -58,7 +58,7 @@ class CodeEditorState extends State<CodeEditor> {
     if (errors == null) return;
     errorMap.clear();
     errors.forEach((err) {
-      final line = err.token.loc.i + 1;
+      final line = err.line + 1;
       if (!errorMap.containsKey(line)) errorMap[line] = <LangError>[];
       errorMap[line].add(err);
     });

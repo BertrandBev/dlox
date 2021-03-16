@@ -8,6 +8,7 @@ build/
 # Directory created by dartdoc
 doc/api/
 reference/
+craftinginterpreters/
 examples/
 *.out
 *.exe
