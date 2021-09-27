@@ -9,10 +9,12 @@ import 'package:provider/provider.dart';
 import 'code_editor.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({Key key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -21,13 +23,13 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blueGrey,
       ),
-      home: HomePage(),
+      home: const HomePage(),
     );
   }
 }
 
 class HomePage extends StatefulWidget {
-  HomePage({Key key}) : super(key: key);
+  const HomePage({Key key}) : super(key: key);
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -77,31 +79,32 @@ class _HomePageState extends State<HomePage> {
       key: stdoutKey,
       lines: runtime.stdout,
       icon: MaterialCommunityIcons.monitor,
-      title: "Terminal",
+      title: 'Terminal',
     );
     final compilerMonitor = Monitor(
       autoScroll: false,
       key: compilerKey,
       lines: runtime.compilerOut,
       icon: MaterialCommunityIcons.matrix,
-      title: "Bytecode",
+      title: 'Bytecode',
     );
-    var monitorTitle = "VM trace";
+    var monitorTitle = 'VM trace';
     final vmMonitor = Monitor(
       key: vmKey,
       lines: runtime.vmOut,
       icon: MaterialCommunityIcons.magnify,
       placeholderBuilder: (widget) {
-        if (!runtime.vmTraceEnabled)
+        if (!runtime.vmTraceEnabled) {
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               widget,
-              SizedBox(height: 4.0),
-              Text("disabled for performance",
+              const SizedBox(height: 4.0),
+              const Text('disabled for performance',
                   style: TextStyle(fontSize: 16.0, color: Colors.grey)),
             ],
           );
+        }
         return widget;
       },
       title: monitorTitle,

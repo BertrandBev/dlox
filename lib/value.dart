@@ -60,7 +60,9 @@ String valueToString(
   } else if (value is double) {
     if (value.isInfinite) {
       return '∞';
-    } else if (value.isNaN) return 'NaN';
+    } else if (value.isNaN) {
+      return 'NaN';
+    }
     return sprintf('%g', [value]);
   } else if (value is String) {
     return value.trim().isEmpty && quoteEmpty ? '\'$value\'' : value;

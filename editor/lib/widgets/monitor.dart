@@ -11,7 +11,7 @@ class Monitor extends StatefulWidget {
   final bool autoScroll;
   final Widget Function(Widget) placeholderBuilder;
 
-  Monitor({
+  const Monitor({
     Key key,
     this.lines,
     this.icon,
@@ -33,7 +33,7 @@ class MonitorState extends State<Monitor> {
     final lv = ListView.builder(
       shrinkWrap: true,
       controller: _scrollController,
-      padding: EdgeInsets.all(8.0),
+      padding: const EdgeInsets.all(8.0),
       itemCount: widget.lines.length,
       reverse: widget.autoScroll,
       itemBuilder: (context, k) {
@@ -47,37 +47,37 @@ class MonitorState extends State<Monitor> {
           ),
           parse: <MatchText>[
             MatchText(
-              pattern: r"-?\d+(?:\.\d+)?",
-              style: TextStyle(
+              pattern: r'-?\d+(?:\.\d+)?',
+              style: const TextStyle(
                 color: ColorTheme.numbers,
               ),
             ),
             MatchText(
-              pattern: r"OP_[A-Z_]+",
-              style: TextStyle(
+              pattern: r'OP_[A-Z_]+',
+              style: const TextStyle(
                 color: ColorTheme.functions,
               ),
             ),
             MatchText(
-              pattern: r"==.+==",
-              style: TextStyle(color: ColorTheme.debugValues),
+              pattern: r'==.+==',
+              style: const TextStyle(color: ColorTheme.debugValues),
             ),
             MatchText(
               pattern: r"'.+'",
-              style: TextStyle(color: ColorTheme.strings),
+              style: const TextStyle(color: ColorTheme.strings),
             ),
             MatchText(
-              pattern: r"true|false",
-              style: TextStyle(color: ColorTheme.numbers),
+              pattern: r'true|false',
+              style: const TextStyle(color: ColorTheme.numbers),
             ),
             MatchText(
-              pattern: r"(Runtime error)|(Compiler error)",
-              style: TextStyle(color: ColorTheme.error),
+              pattern: r'(Runtime error)|(Compiler error)',
+              style: const TextStyle(color: ColorTheme.error),
             ),
           ],
         );
         return Padding(
-          padding: EdgeInsets.all(4.0),
+          padding: const EdgeInsets.all(4.0),
           child: parsed,
         );
       },
@@ -85,7 +85,7 @@ class MonitorState extends State<Monitor> {
     final col = Column(children: [
       Flexible(child: lv),
     ]);
-    Widget placeholder = SizedBox.shrink();
+    Widget placeholder = const SizedBox.shrink();
     if (widget.lines.isEmpty) {
       Widget child = Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -94,7 +94,7 @@ class MonitorState extends State<Monitor> {
             widget.icon,
             color: Colors.grey.shade300,
           ),
-          SizedBox(width: 20.0),
+          const SizedBox(width: 20.0),
           Text(
             widget.title,
             style: TextStyle(
@@ -104,8 +104,9 @@ class MonitorState extends State<Monitor> {
           ),
         ],
       );
-      if (widget.placeholderBuilder != null)
+      if (widget.placeholderBuilder != null) {
         child = widget.placeholderBuilder(child);
+      }
       placeholder = Center(child: child);
     }
     return Container(

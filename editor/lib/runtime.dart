@@ -44,7 +44,7 @@ class Runtime extends ChangeNotifier {
 
   void _populateBuffer(List<String> buf, String str) {
     if (str == null) return;
-    str.trim().split("\n").where((line) => line.isNotEmpty).forEach((line) {
+    str.trim().split('\n').where((line) => line.isNotEmpty).forEach((line) {
       buf.add(line);
     });
     notifyListeners();
@@ -52,9 +52,9 @@ class Runtime extends ChangeNotifier {
 
   void _processErrors(List<LangError> errors) {
     if (errors == null) return;
-    errors.forEach((err) {
+    for (var err in errors) {
       _populateBuffer(stdout, err.toString());
-    });
+    }
     notifyListeners();
   }
 
@@ -71,6 +71,7 @@ class Runtime extends ChangeNotifier {
     notifyListeners();
   }
 
+  @override
   void dispose() {
     if (compileTimer != null) compileTimer.cancel();
     super.dispose();
@@ -79,7 +80,7 @@ class Runtime extends ChangeNotifier {
   void setSource(String source) {
     this.source = source;
     if (compileTimer != null) compileTimer.cancel();
-    compileTimer = Timer(Duration(milliseconds: 500), () {
+    compileTimer = Timer(const Duration(milliseconds: 500), () {
       compileTimer = null;
       compile();
     });
@@ -90,8 +91,10 @@ class Runtime extends ChangeNotifier {
   }
 
   void compile() {
-    if (source == null || (compiledSource == source && compilerResult != null))
+    if (source == null ||
+        (compiledSource == source && compilerResult != null)) {
       return;
+    }
     // Clear interpeter output
     interpreterResult = null;
     onInterpreterResult(interpreterResult);
@@ -120,8 +123,9 @@ class Runtime extends ChangeNotifier {
   bool _initCode() {
     // Compile if needed
     compile();
-    if (compilerResult == null || compilerResult.errors.isNotEmpty)
+    if (compilerResult == null || compilerResult.errors.isNotEmpty) {
       return false;
+    }
     if (vm.compilerResult != compilerResult) {
       vm.setFunction(compilerResult, FunctionParams());
       interpreterResult = null;
@@ -162,7 +166,7 @@ class Runtime extends ChangeNotifier {
       final dt = DateTime.now().millisecondsSinceEpoch - timeStartedMs;
       averageIps = vm.stepCount / max(dt, 1) * 1000;
       _onInterpreterResult();
-      await Future.delayed(Duration(seconds: 0));
+      await Future.delayed(const Duration(seconds: 0));
     }
 
     stopFlag = false;

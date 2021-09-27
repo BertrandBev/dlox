@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 class ColorTheme {
-  static Color terminal = Color(0xFF131313);
-  static Color editor = Color(0xFF282828);
-  static Color sidebar = Color(0xFF1E1F1C);
+  static const terminal = Color(0xFF131313);
+  static const editor = Color(0xFF282828);
+  static const sidebar = Color(0xFF1E1F1C);
   // Monokai theme
   static const symbols = Color(0xFFF8F8F2);
   static const keywords = Color(0xFFE05276);

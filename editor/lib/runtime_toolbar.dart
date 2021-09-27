@@ -23,19 +23,22 @@ class _RuntimeToolbarState extends State<RuntimeToolbar> {
     final running = runtime.running;
     final isDone = runtime.done;
     IconData icon = MaterialIcons.play_arrow;
-    if (running)
+    if (running) {
       icon = MaterialIcons.stop;
-    else if (isDone) icon = MaterialCommunityIcons.refresh;
+    } else if (isDone) {
+      icon = MaterialCommunityIcons.refresh;
+    }
     return ProgressButton(
       icon: icon,
       loading: running,
       onTap: () {
-        if (running)
+        if (running) {
           runtime.stop();
-        else if (isDone)
+        } else if (isDone) {
           runtime.reset();
-        else
+        } else {
           runtime.run();
+        }
       },
     );
   }
@@ -47,62 +50,62 @@ class _RuntimeToolbarState extends State<RuntimeToolbar> {
     final iconColor = enabled ? Colors.white : Colors.grey;
     final btn = RawMaterialButton(
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      padding: EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
       onPressed: () => runtime.toggleVmTrace(),
-      constraints: BoxConstraints(minWidth: 0, minHeight: 0),
+      constraints: const BoxConstraints(minWidth: 0, minHeight: 0),
       child: Icon(MaterialCommunityIcons.speedometer, color: iconColor),
       fillColor: color,
       shape: RoundedRectangleBorder(
         side: BorderSide(color: Colors.grey.shade800),
-        borderRadius: BorderRadius.all(Radius.circular(8.0)),
+        borderRadius: const BorderRadius.all(Radius.circular(8.0)),
       ),
     );
     double ips = runtime.averageIps.toDouble();
-    var suffix = "";
+    var suffix = '';
     if (ips > 1000000) {
       ips /= 1000000;
-      suffix = "M";
+      suffix = 'M';
     } else if (ips > 1000) {
       ips /= 1000;
-      suffix = "k";
+      suffix = 'k';
     }
     final ipsStr = ips.toStringAsFixed(suffix.isNotEmpty ? 2 : 0);
     final text = InkWell(
       child: Text(
-        "$ipsStr$suffix ips",
-        style: TextStyle(color: Colors.white, fontSize: 16.0),
+        '$ipsStr$suffix ips',
+        style: const TextStyle(color: Colors.white, fontSize: 16.0),
       ),
       onTap: () {
         Flushbar.show(
           context,
-          "Measures the average number of instructions per second",
+          'Measures the average number of instructions per second',
         );
       },
     );
     return Row(children: [
       text,
-      SizedBox(width: 4.0),
+      const SizedBox(width: 4.0),
       btn,
     ]);
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = Colors.white;
-    final disabledColor = Colors.grey;
+    const color = Colors.white;
+    const disabledColor = Colors.grey;
     final runtime = context.watch<Runtime>();
-    final _step = () => runtime.step();
+    void _step() => runtime.step();
     final _clear = widget.onClear;
 
     final stepBtn = IconButton(
-      icon: Icon(MaterialCommunityIcons.debug_step_over),
+      icon: const Icon(MaterialCommunityIcons.debug_step_over),
       color: color,
       onPressed: runtime.running || runtime.done ? null : _step,
       disabledColor: disabledColor,
     );
 
     final clearBtn = IconButton(
-      icon: Icon(MaterialCommunityIcons.close),
+      icon: const Icon(MaterialCommunityIcons.close),
       color: color,
       onPressed: runtime.running ? null : _clear,
       disabledColor: disabledColor,
@@ -126,7 +129,7 @@ class _RuntimeToolbarState extends State<RuntimeToolbar> {
         stepBtn,
         runBtn,
         clearBtn,
-        Spacer(),
+        const Spacer(),
         speedBtn,
         toggleBtn,
       ],

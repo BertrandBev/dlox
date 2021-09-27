@@ -6,7 +6,6 @@ import 'package:dlox/debug.dart';
 import 'package:dlox/error.dart';
 import 'package:dlox/native.dart';
 import 'package:dlox/object.dart';
-import 'package:dlox/scanner.dart';
 import 'package:dlox/table.dart';
 import 'package:dlox/value.dart';
 import 'package:sprintf/sprintf.dart';
@@ -53,8 +52,8 @@ class FunctionParams {
 
 class VM {
   static const INIT_STRING = 'init';
-  final List<CallFrame> frames = List<CallFrame>(FRAMES_MAX);
-  final List<Object> stack = List<Object>(STACK_MAX);
+  final List<CallFrame> frames = List<CallFrame>.filled(FRAMES_MAX, null);
+  final List<Object> stack = List<Object>.filled(STACK_MAX, null);
   // VM state
   final List<RuntimeError> errors = [];
   final Table globals = Table();
@@ -158,14 +157,18 @@ class VM {
     // Init VM
     final closure = ObjClosure(fun);
     push(closure);
-    if (params.args != null) params.args.forEach((arg) => push(arg));
+    if (params.args != null) {
+      for (var arg in params.args) {
+        push(arg);
+      }
+    }
     callValue(closure, params.args?.length ?? 0);
   }
 
   void defineNatives() {
-    NATIVE_FUNCTIONS.forEach((function) {
+    for (var function in NATIVE_FUNCTIONS) {
       globals.setVal(function.name, function);
-    });
+    }
     NATIVE_VALUES.forEach((key, value) {
       globals.setVal(key, value);
     });
@@ -324,7 +327,7 @@ class VM {
     if (receiver is ObjNativeClass) {
       return invokeNativeClass(receiver, name, argCount);
     }
-    if (!(receiver is ObjInstance)) {
+    if (receiver is! ObjInstance) {
       runtimeError('Only instances have methods');
       return false;
     }
@@ -336,7 +339,7 @@ class VM {
     }
     if (instance.klass == null) {
       final klass = globals.getVal(instance.klassName);
-      if (!(klass is ObjClass)) {
+      if (klass is! ObjClass) {
         runtimeError('Class ${instance.klassName} not found');
         return false;
       }
@@ -422,7 +425,7 @@ class VM {
   }
 
   bool assertNumber(a, b) {
-    if (!(a is double) || !(b is double)) {
+    if (a is! double || b is! double) {
       runtimeError('Operands must be numbers');
       return false;
     }
@@ -431,7 +434,7 @@ class VM {
 
   int checkIndex(int length, Object idxObj, {bool fromStart = true}) {
     if (idxObj == Nil) idxObj = fromStart ? 0.0 : length.toDouble();
-    if (!(idxObj is double)) {
+    if (idxObj is! double) {
       runtimeError('Index must be a number');
       return null;
     }
@@ -756,7 +759,7 @@ class VM {
           break;
 
         case OpCode.NEGATE:
-          if (!(peek(0) is double)) {
+          if (peek(0) is! double) {
             return runtimeError('Operand must be a number');
           }
           push(-(pop() as double));
@@ -867,7 +870,7 @@ class VM {
         case OpCode.INHERIT:
           {
             final sup = peek(1);
-            if (!(sup is ObjClass)) {
+            if (sup is! ObjClass) {
               return runtimeError('Superclass must be a class');
             }
             ObjClass superclass = sup;
@@ -892,7 +895,7 @@ class VM {
           break;
 
         case OpCode.LIST_INIT_RANGE:
-          if (!(peek(0) is double) || !(peek(1) is double)) {
+          if (peek(0) is! double || peek(1) is! double) {
             return runtimeError('List initializer bounds must be number');
           }
           final start = peek(1) as double;

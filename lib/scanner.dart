@@ -195,7 +195,7 @@ class Token {
     if (type == TokenType.EOF) return '';
     if (type == TokenType.NUMBER ||
         type == TokenType.STRING ||
-        type == TokenType.IDENTIFIER) return this.str;
+        type == TokenType.IDENTIFIER) return str;
     return TOKEN_REPR[type];
   }
 
@@ -228,7 +228,7 @@ class Scanner {
     if (!eof) tokens.removeLast();
     if (scanner.traceScanner) {
       var line = -1;
-      tokens.forEach((token) {
+      for (var token in tokens) {
         if (token.loc.i != line) {
           scanner.debug.stdwrite(sprintf('%4d ', [token.loc.i]));
           line = token.loc.i;
@@ -237,7 +237,7 @@ class Scanner {
         }
         scanner.debug
             .stdwrite(sprintf("%2d '%s'\n", [token.type.index, token.str]));
-      });
+      }
     }
     return tokens;
   }

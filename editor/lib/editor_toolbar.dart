@@ -36,11 +36,11 @@ class _EditorToolbarState extends State<EditorToolbar> {
         .where((String key) => key.contains('snippets/'))
         .toList();
     pathMap.clear();
-    snippetList.forEach((el) {
+    for (var el in snippetList) {
       pathMap[fname(el)] = el;
-    });
+    }
     // Set first snippet
-    await setSnippet("fibonacci");  // Default file
+    await setSnippet('fibonacci'); // Default file
   }
 
   Future setSnippet(String fname) async {
@@ -50,19 +50,19 @@ class _EditorToolbarState extends State<EditorToolbar> {
   }
 
   String fname(String path) {
-    final split = path.split("/");
-    return split.last.replaceAll("_", " ").replaceAll(".lox", "");
+    final split = path.split('/');
+    return split.last.replaceAll('_', ' ').replaceAll('.lox', '');
   }
 
   Widget buildDropdown() {
     final dropdown = DropdownButton<String>(
       value: snippetFname,
       items: pathMap.keys.map((String value) {
-        return new DropdownMenuItem<String>(
+        return DropdownMenuItem<String>(
           value: value,
           child: Text(
             value,
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 16.0,
             ),
@@ -72,10 +72,10 @@ class _EditorToolbarState extends State<EditorToolbar> {
       onChanged: setSnippet,
       iconEnabledColor: Colors.white,
       dropdownColor: Colors.black87,
-      underline: SizedBox.shrink(),
+      underline: const SizedBox.shrink(),
     );
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
       child: dropdown,
     );
   }
@@ -96,10 +96,9 @@ class _EditorToolbarState extends State<EditorToolbar> {
   @override
   Widget build(BuildContext context) {
     final github = IconButton(
-      padding: EdgeInsets.only(left: 8.0),
-      icon: Icon(FontAwesome5Brands.github, color: Colors.white),
-      onPressed: () =>
-          _launchInBrowser("https://github.com/BertrandBev/dlox"),
+      padding: const EdgeInsets.only(left: 8.0),
+      icon: const Icon(FontAwesome5Brands.github, color: Colors.white),
+      onPressed: () => _launchInBrowser('https://github.com/BertrandBev/dlox'),
     );
 
     final snippets = buildDropdown();
@@ -117,7 +116,7 @@ class _EditorToolbarState extends State<EditorToolbar> {
       children: [
         github,
         snippets,
-        Spacer(),
+        const Spacer(),
         toggleBtn,
       ],
     );

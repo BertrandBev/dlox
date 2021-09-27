@@ -41,7 +41,9 @@ class Parser {
       // Skip invalid tokens
       if (current.type == TokenType.ERROR) {
         errorAtCurrent(current.str);
-      } else if (current.type != TokenType.COMMENT) break;
+      } else if (current.type != TokenType.COMMENT) {
+        break;
+      }
     }
   }
 

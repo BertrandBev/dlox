@@ -1,4 +1,3 @@
-
 import 'package:dlox/chunk.dart';
 import 'package:dlox/table.dart';
 import 'package:dlox/value.dart';
@@ -36,7 +35,7 @@ class ObjClosure {
   int upvalueCount;
 
   ObjClosure(this.function) {
-    upvalues = List<ObjUpvalue>(function.upvalueCount);
+    upvalues = List.filled(function.upvalueCount, null);
     upvalueCount = function.upvalueCount;
   }
 }
@@ -103,6 +102,6 @@ String objectToString(Object value, {int maxChars = 100}) {
     return value.stringRepr(maxChars: maxChars);
   } else if (value is NativeClassCreator) {
     return '<native class>';
-  } 
+  }
   return value.toString();
 }

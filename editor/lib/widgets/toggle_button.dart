@@ -26,9 +26,9 @@ class ToggleButton extends StatelessWidget {
     final iconColor = enabled ? Colors.white : Colors.grey;
     return RawMaterialButton(
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      padding: EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
       onPressed: action,
-      constraints: BoxConstraints(minWidth: 0, minHeight: 0),
+      constraints: const BoxConstraints(minWidth: 0, minHeight: 0),
       child: Icon(icon, color: iconColor),
       fillColor: color,
       shape: RoundedRectangleBorder(

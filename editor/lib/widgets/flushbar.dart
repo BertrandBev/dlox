@@ -1,3 +1,5 @@
+// ignore_for_file: constant_identifier_names
+
 import 'package:flutter/material.dart';
 
 enum FlushbarType {
@@ -19,18 +21,18 @@ class Flushbar {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          margin: EdgeInsets.all(0.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          margin: const EdgeInsets.all(0.0),
           decoration: BoxDecoration(
             color: Colors.grey.shade900,
-            borderRadius: BorderRadius.all(Radius.circular(8.0)),
+            borderRadius: const BorderRadius.all(Radius.circular(8.0)),
           ),
           child: Row(
             children: [
               Icon(icon, color: color),
-              SizedBox(width: 8.0),
+              const SizedBox(width: 8.0),
               Flexible(
-                child: Text(msg, style: TextStyle(fontSize: 16.0)),
+                child: Text(msg, style: const TextStyle(fontSize: 16.0)),
               ),
             ],
           ),

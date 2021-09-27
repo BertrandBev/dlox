@@ -15,7 +15,7 @@ import 'constants.dart';
 class CodeEditor extends StatefulWidget {
   final Runtime runtime;
 
-  CodeEditor({Key key, this.runtime}) : super(key: key);
+  const CodeEditor({Key key, this.runtime}) : super(key: key);
 
   @override
   CodeEditorState createState() => CodeEditorState();
@@ -57,21 +57,21 @@ class CodeEditorState extends State<CodeEditor> {
   void _setErrors(List<LangError> errors) {
     if (errors == null) return;
     errorMap.clear();
-    errors.forEach((err) {
+    for (var err in errors) {
       final line = err.line + 1;
       if (!errorMap.containsKey(line)) errorMap[line] = <LangError>[];
       errorMap[line].add(err);
-    });
+    }
     setState(() {});
   }
 
   void setCompilerResult(CompilerResult result) {
-    this.compilerResult = result;
+    compilerResult = result;
     _setErrors(result?.errors);
   }
 
   void setInterpreterResult(InterpreterResult result) {
-    this.interpreterResult = result;
+    interpreterResult = result;
     _setErrors(result?.errors);
   }
 
@@ -81,28 +81,30 @@ class CodeEditorState extends State<CodeEditor> {
 
   TextSpan _lineNumberBuilder(int line, TextStyle style) {
     // if (line == 2) return TextSpan(text: "@", style: style);
-    if (errorMap.containsKey(line))
+    if (errorMap.containsKey(line)) {
       return TextSpan(
-        text: "❌",
+        text: '❌',
         style: style.copyWith(color: Colors.red),
         recognizer: TapGestureRecognizer()..onTap = () => print('OnTap'),
       );
-    if (interpreterResult?.lastLine == line - 1)
+    }
+    if (interpreterResult?.lastLine == line - 1) {
       return TextSpan(
-        text: ">",
+        text: '>',
         style: style.copyWith(
           color: ColorTheme.functions,
           fontWeight: FontWeight.bold,
         ),
       );
-    return TextSpan(text: "$line", style: style);
+    }
+    return TextSpan(text: '$line', style: style);
   }
 
   @override
   Widget build(BuildContext context) {
     return CodeField(
       controller: _codeController,
-      textStyle: TextStyle(fontFamily: 'SourceCode'),
+      textStyle: const TextStyle(fontFamily: 'SourceCode'),
       expands: true,
       lineNumberBuilder: _lineNumberBuilder,
     );
